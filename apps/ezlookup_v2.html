@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<!-- ===========================================================================
+  EZ LOOKUP  —  OFFICE-SIDE TOOL  (Horizon 1 build)
+  ---------------------------------------------------------------------------
+  Runs on the OFFICE machine: Windows 10, no admin, no installs, browser only.
+  ONE static file. Double-click it. It asks for the county GeoPackage that the
+  home-side factory (build_lewis.sh) produced; the user picks it off the thumb
+  drive. Nothing installs, nothing is served.
+
+  HOW "NO INSTALL" IS MET
+    sql.js  — SQLite compiled to WebAssembly, opens a .gpkg (which IS SQLite)
+              inside the browser.
+    Leaflet — parcel map view. NO satellite basemap (see CHALK LINE below).
+    For a fully offline office box: download sql-wasm.js, sql-wasm.wasm,
+    leaflet.js, leaflet.css once on the HOME machine, drop them next to this
+    file, and flip ASSETS_LOCAL = true.
+
+  THE ANTI-BURGER PRINCIPLE
+    Every screen ends with something the user would otherwise have gone to the
+    county website for, already done. The result screen is the finish line:
+    client snapshot + paper-sketch parcel map + copyable adjoiner block +
+    click-any-parcel-for-its-documents. No county visit for the research phase.
+
+  THE CHALK LINE (assessor-grade, NOT survey-grade) — APPLIED TO PIXELS
+    The map is a REFERENCE SKETCH, never a drawing. Enforced visually:
+      - permanent grade-stamp watermark across the map
+      - no scale bar, no imagery basemap
+      - approximate assessor fabric, paper-toned background
+    Satellite tiles are deliberately NOT wired in. They belong with Horizon 2
+    (corrected linework) — imagery under approximate lines is the exact thing
+    that makes an assessor polygon look like a boundary determination.
+
+  FAIL LOUD
+    - below CONFIDENCE_MIN the owner search returns NOTHING, never a guess.
+    - the T/R filter narrows CANDIDATES, never gates RESULTS: an empty T/R
+      auto-widens to the 8 neighbor townships before giving up.
+    - the T/R path stands ALONE: county + T/R with no name and no address
+      still produces the client parcel and the adjoiner block.
+
+  STUBS (marked @STUB) — real engine work, intentionally not finished here:
+    - fuzzy scorer is token-overlap; swap in Jaro-Winkler / a rapidfuzz port.
+    - adjoiner direction uses polygon-centroid bearing off the subject
+      centroid; good enough to label NE/E/SE… upgrade to true edge-adjacency
+      using the gpkg geometry blobs.
+    - per-county recorder deep-links: LEWIS quickdocs query params still
+      placeholder; COWLITZ / THURSTON / GRAYS_HARBOR deep-link patterns not
+      yet probed (route to portal root). PACIFIC is countygovernmentrecords
+      with @STUB params. RECORDER_ROUTES table below carries per-county state.
+      See md/EZ_LOOKUP_COUNTY_PROBES_2026-05-20.md for probe findings.
+============================================================================ -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EZ Lookup — parcel & adjoiner</title>
+
+<!-- Leaflet. For offline office box, see ASSETS_LOCAL below. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+  :root{
+    --bg:#1b1e23; --panel:#23272e; --panel2:#1f232a; --line:#363b44;
+    --ink:#e9e7e1; --dim:#888d97; --accent:#d98e2b; --accent2:#e0a857;
+    --ok:#5fa074; --warn:#c8553d; --field:#14161a;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+    --sans:'Segoe UI',system-ui,sans-serif;
+    --paper:#ece5d4;            /* paper-sketch map background */
+    --paperline:#9a8f73;        /* approximate fabric line color */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);
+       font-size:14px;line-height:1.45}
+
+  header{padding:12px 18px;border-bottom:1px solid var(--line);
+         display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  header h1{margin:0;font-size:15px;letter-spacing:.16em;font-weight:700;
+            text-transform:uppercase}
+  header .meta{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  header .grade{margin-left:auto;font-size:10px;letter-spacing:.07em;
+                color:var(--warn);text-transform:uppercase;
+                border:1px solid var(--warn);padding:2px 7px;border-radius:3px}
+
+  .layout{display:flex;gap:0;height:calc(100% - 49px)}
+  .left{width:380px;min-width:340px;overflow-y:auto;padding:16px;
+        border-right:1px solid var(--line)}
+  .right{flex:1;position:relative;background:var(--paper)}
+
+  /* ---- step cards ---- */
+  .step{border:1px solid var(--line);background:var(--panel);
+        border-radius:4px;margin-bottom:12px}
+  .step.locked{opacity:.4;pointer-events:none}
+  .step h2{margin:0;padding:8px 12px;font-size:11px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--dim);
+           border-bottom:1px solid var(--line)}
+  .step h2 .n{color:var(--accent);font-family:var(--mono);margin-right:6px}
+  .step .body{padding:12px}
+
+  label{display:block;font-size:10px;color:var(--dim);margin:0 0 3px;
+        text-transform:uppercase;letter-spacing:.07em}
+  input,select{width:100%;background:var(--field);border:1px solid var(--line);
+        color:var(--ink);font-family:var(--mono);font-size:13px;
+        padding:7px 9px;border-radius:3px}
+  input:focus,select:focus{outline:1px solid var(--accent);
+        border-color:var(--accent)}
+  .row{display:flex;gap:8px}.row>div{flex:1}
+  button{background:var(--accent);color:#1b1e23;border:0;font-weight:700;
+        font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+        padding:8px 14px;border-radius:3px;cursor:pointer;margin-top:9px}
+  button.ghost{background:transparent;color:var(--dim);
+        border:1px solid var(--line);font-weight:600}
+  button:disabled{opacity:.35;cursor:default}
+  .note{font-size:10.5px;color:var(--dim);margin-top:7px}
+  .candcount{font-family:var(--mono);color:var(--ok)}
+
+  .banner{padding:8px 10px;border-radius:3px;font-size:11.5px;margin-top:9px}
+  .banner.warn{background:#2e201c;border:1px solid var(--warn);color:#e6b3a6}
+  .banner.ok{background:#1d2a22;border:1px solid var(--ok);color:#a6d4b5}
+
+  /* ---- search hits ---- */
+  .hit{display:flex;gap:9px;align-items:center;padding:7px 9px;
+       border:1px solid var(--line);border-radius:3px;margin-top:5px;
+       background:var(--field);cursor:pointer}
+  .hit:hover{border-color:var(--accent)}
+  .hit .pin{font-family:var(--mono);color:var(--accent);font-size:12px}
+  .hit .own{flex:1;font-size:12px}
+  .hit .conf{font-family:var(--mono);font-size:10.5px}
+  .conf.hi{color:var(--ok)}.conf.lo{color:var(--warn)}
+
+  /* ---- result screen ---- */
+  .res-snap{font-size:12.5px}
+  .res-snap .pinbig{font-family:var(--mono);font-size:17px;color:var(--accent2);
+        letter-spacing:.02em}
+  .res-snap dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;
+        margin:8px 0 0}
+  .res-snap dt{color:var(--dim);font-size:10.5px;text-transform:uppercase;
+        letter-spacing:.05em;align-self:center}
+  .res-snap dd{margin:0;font-family:var(--mono);font-size:12px}
+
+  /* ---- adjoiner block: the primary product ---- */
+  #adjoiner table{width:100%;border-collapse:collapse;font-family:var(--mono);
+        font-size:12.5px;margin-top:6px}
+  #adjoiner td{border:1px solid var(--line);padding:5px 8px}
+  #adjoiner td.dir{color:var(--accent);width:42px;text-align:center;
+        font-weight:700}
+  #adjoiner td.tpn{cursor:pointer}
+  #adjoiner td.tpn:hover{color:var(--accent2);text-decoration:underline}
+  #adjoiner td.own{color:var(--dim);font-family:var(--sans);font-size:11px}
+  #adjoiner .empty{color:var(--warn)}
+  pre.copy{background:var(--field);border:1px solid var(--line);
+        border-radius:3px;padding:9px;font-family:var(--mono);font-size:11.5px;
+        white-space:pre-wrap;margin-top:7px;color:var(--ink)}
+
+  /* ---- document drawer (click any parcel) ---- */
+  .docrow{border:1px solid var(--line);border-radius:3px;margin-top:6px;
+        background:var(--panel2);padding:8px 10px}
+  .docrow .dh{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+        color:var(--accent);margin-bottom:4px}
+  .docrow a{color:var(--accent2);font-size:12px}
+  .docrow .afn{font-family:var(--mono);font-size:12px;cursor:pointer}
+  .docrow .afn:hover{color:var(--accent2)}
+  .docrow .flag{font-size:11px;color:var(--warn)}
+  .disclaim{font-size:10px;color:var(--dim);margin-top:4px;font-style:italic}
+
+  /* ---- map ---- */
+  #map{position:absolute;inset:0}
+  .leaflet-container{background:var(--paper)!important}
+  .mapstamp{position:absolute;z-index:500;pointer-events:none;
+        left:50%;top:50%;transform:translate(-50%,-50%) rotate(-24deg);
+        font-family:var(--sans);font-weight:800;letter-spacing:.12em;
+        font-size:34px;color:rgba(120,90,40,.16);text-align:center;
+        white-space:nowrap}
+  .mapstamp small{display:block;font-size:13px;letter-spacing:.18em;
+        margin-top:4px}
+  .maphint{position:absolute;z-index:500;left:10px;bottom:10px;
+        background:rgba(27,30,35,.86);border:1px solid var(--line);
+        border-radius:3px;padding:5px 9px;font-size:10.5px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1>EZ&nbsp;Lookup</h1>
+  <span class="meta" id="meta">no county loaded</span>
+  <span class="grade">assessor-grade reference — not a survey</span>
+</header>
+
+<div class="layout">
+  <!-- ============ LEFT: the cascade + result ============ -->
+  <div class="left">
+
+    <!-- STEP 1 -->
+    <section class="step" id="step1">
+      <h2><span class="n">1</span>County</h2>
+      <div class="body">
+        <label>County GeoPackage (built by the home-side factory)</label>
+        <input type="file" id="gpkgFile" accept=".gpkg,.sqlite">
+        <div class="note">Picking the file <em>is</em> choosing the county.
+          No other county's data is in this file.</div>
+        <div class="banner ok" id="loadedBanner" style="display:none"></div>
+        <div id="countyPickWrap" style="display:none;margin-top:10px">
+          <label>Active county (scopes every search)</label>
+          <select id="countyPick"></select>
+          <div class="note">Multi-county database. Picking one county drops the
+            others out of every query that follows — search, T/R, adjoiners.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="step locked" id="step2">
+      <h2><span class="n">2</span>Township / Range</h2>
+      <div class="body">
+        <div class="row">
+          <div><label>Twp (N)</label><input id="twp" placeholder="13"></div>
+          <div><label>Range</label><input id="rng" placeholder="2"></div>
+          <div><label>Dir</label><select id="rdir">
+            <option>W</option><option>E</option></select></div>
+          <div><label>Sec (opt)</label><input id="sec" placeholder="all"></div>
+        </div>
+        <button id="applyTRS">Narrow candidates</button>
+        <div class="note" id="trsNote">County + T/R are the two facts on every
+          job. This narrows the set the name search runs against — and the
+          T/R path works with no name and no address at all.</div>
+      </div>
+    </section>
+
+    <!-- STEP 3 -->
+    <section class="step locked" id="step3">
+      <h2><span class="n">3</span>Find the client parcel</h2>
+      <div class="body">
+        <div class="row">
+          <div><label>Owner name</label><input id="qOwner" placeholder="SMITH"></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div><label>— or address</label><input id="qAddr" placeholder="825 B ST"></div>
+          <div><label>— or parcel #</label><input id="qPin" placeholder="007391001003"></div>
+        </div>
+        <button id="search">Search</button>
+        <button class="ghost" id="listAll" title="No name? Use the whole T/R.">
+          List the T/R</button>
+        <div id="results"></div>
+      </div>
+    </section>
+
+    <!-- RESULT -->
+    <section class="step locked" id="resultCard">
+      <h2><span class="n">→</span>Result</h2>
+      <div class="body" id="resultBody"></div>
+    </section>
+  </div>
+
+  <!-- ============ RIGHT: paper-sketch parcel map ============ -->
+  <div class="right">
+    <div id="map"></div>
+    <div class="mapstamp">ASSESSOR PARCEL FABRIC
+      <small>NOT A SURVEY · NOT TO SCALE</small></div>
+    <div class="maphint" id="maphint">Load a county and find a parcel.</div>
+  </div>
+</div>
+
+<script>const ASSETS_LOCAL=false;            /* flip true for offline office box */
+const SQLJS_BASE = ASSETS_LOCAL ? './'
+  : 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/';</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+/* ===========================================================================
+   CONFIG
+   =========================================================================*/
+const CONFIDENCE_MIN = 0.55;     // owner search: below this -> return NOTHING
+const DIRS8 = ['N','NE','E','SE','S','SW','W','NW'];
+
+/* ---------------------------------------------------------------------------
+   PER-COUNTY RECORDER + ASSESSOR ROUTING
+   --------------------------------------------------------------------------
+   Every western WA county uses a different recorder platform. The 2026-05-20
+   probe session catalogued them (see md/EZ_LOOKUP_COUNTY_PROBES_2026-05-20.md).
+   Each entry must provide byPin() and byName(); deep-link query params marked
+   @STUB are placeholders until each platform's URL pattern is reverse-
+   engineered against a live search.
+
+   Fallback (UNKNOWN county): we route to the auditor's site root, never
+   to a wrong county's recorder. Failing loud is better than the burger of
+   a confidently-wrong link.                                                 */
+const RECORDER_ROUTES = {
+  LEWIS: {
+    /* quickdocs — records to 1848, free imaging since Oct 2010. @STUB params. */
+    base: 'https://quickdocs.lewiscountywa.gov/recorder/web/',
+    byPin:  pin => 'https://quickdocs.lewiscountywa.gov/recorder/web/search.aspx?type=parcel&pin=' + encodeURIComponent(pin),
+    byName: nm  => 'https://quickdocs.lewiscountywa.gov/recorder/web/search.aspx?type=grantor&name=' + encodeURIComponent(nm),
+    assessor: pin => 'https://atlas.lewiscountywa.gov/parcel/' + encodeURIComponent(pin),
+    note: 'quickdocs deep-link params are @STUB until reverse-engineered.'
+  },
+  COWLITZ: {
+    /* @STUB — recorder platform TBD on first Cowlitz job. */
+    base: 'https://www.cowlitzwa.gov/216/Auditor',
+    byPin:  pin => 'https://www.cowlitzwa.gov/216/Auditor',
+    byName: nm  => 'https://www.cowlitzwa.gov/216/Auditor',
+    assessor: pin => 'https://www.cowlitzwa.gov/204/Assessor',
+    note: 'Cowlitz recorder deep-link not yet mapped — manual search.'
+  },
+  THURSTON: {
+    /* @STUB — recorder platform TBD on first Thurston job. */
+    base: 'https://www.thurstoncountywa.gov/departments/auditor/recording',
+    byPin:  pin => 'https://www.thurstoncountywa.gov/departments/auditor/recording',
+    byName: nm  => 'https://www.thurstoncountywa.gov/departments/auditor/recording',
+    assessor: pin => 'https://tcproperty.thurstoncountywa.gov/propsql/front.asp',
+    note: 'Thurston recorder deep-link not yet mapped — manual search.'
+  },
+  PACIFIC: {
+    /* countygovernmentrecords.com — records to 1873, searchable by
+       TPN/name/doc#/book-page/date. Confirmed working portal 2026-05-20. */
+    base: 'https://pacificwa.countygovernmentrecords.com/',
+    byPin:  pin => 'https://pacificwa.countygovernmentrecords.com/?parcel=' + encodeURIComponent(pin),
+    byName: nm  => 'https://pacificwa.countygovernmentrecords.com/?grantor=' + encodeURIComponent(nm),
+    assessor: pin => 'https://pacificwa-taxsifter.publicaccessnow.com/Search/Result.aspx?p=' + encodeURIComponent(pin),
+    note: 'Pacific records back to 1873. Query params @STUB.'
+  },
+  GRAYS_HARBOR: {
+    /* @STUB — recorder platform uses Eagle (court-records vendor); deep-link
+       pattern not yet confirmed. Manual search until probed. */
+    base: 'https://www.co.grays-harbor.wa.us/Auditor/',
+    byPin:  pin => 'https://www.co.grays-harbor.wa.us/Auditor/',
+    byName: nm  => 'https://www.co.grays-harbor.wa.us/Auditor/',
+    assessor: pin => 'https://graysharborwa.mapgeo.io/',
+    note: 'Grays Harbor recorder uses Eagle portal — manual search.'
+  },
+  /* Fallback when ACTIVE_COUNTY is null or unrecognized. NEVER route to a
+     specific county's site — fail loud with a marker the user will notice. */
+  _UNKNOWN: {
+    base: '#',
+    byPin:  pin => '#unknown-county-no-recorder-route',
+    byName: nm  => '#unknown-county-no-recorder-route',
+    assessor: pin => '#unknown-county-no-assessor-route',
+    note: 'No county selected — recorder routing unavailable.'
+  }
+};
+
+/* Resolve current county's routes. Normalizes "Grays Harbor"/"GRAYS_HARBOR"/
+   "grays_harbor" → GRAYS_HARBOR. Returns the _UNKNOWN bundle on miss. */
+function currentRoutes(){
+  if(!ACTIVE_COUNTY) return RECORDER_ROUTES._UNKNOWN;
+  const key = String(ACTIVE_COUNTY).toUpperCase().replace(/[\s-]+/g,'_');
+  return RECORDER_ROUTES[key] || RECORDER_ROUTES._UNKNOWN;
+}
+
+/* Compatibility shims so the rest of the file doesn't need to know about
+   the routing table. They look up the active county at call time. */
+const DEEDLINK = {
+  get base(){ return currentRoutes().base; },
+  byPin:  pin => currentRoutes().byPin(pin),
+  byName: nm  => currentRoutes().byName(nm)
+};
+const ASSESSORLINK = pin => currentRoutes().assessor(pin);
+
+/* ===========================================================================
+   STATE
+   =========================================================================*/
+let DB=null, CAND=null, MAP=null, LAYERS={subject:null,neighbors:null};
+/* Multi-county dropdown state. ACTIVE_COUNTY=null means "no county filter"
+   (used when the .gpkg is single-county and lacks the county column). */
+let ACTIVE_COUNTY=null;
+let MULTI_COUNTY=false;
+let HAS_PARCEL_ALT=false;
+let HAS_LATLNG=false;
+let HAS_SECTIONS=false;
+const $ = id => document.getElementById(id);
+const unlock = id => $(id).classList.remove('locked');
+const esc = s => (s==null?'':String(s)).replace(/[<>&]/g,
+  c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+
+/* ---------------------------------------------------------------------------
+   STEP 1 — load county GeoPackage
+   ------------------------------------------------------------------------ */
+$('gpkgFile').addEventListener('change', async e => {
+  const file=e.target.files[0]; if(!file) return;
+  $('meta').textContent='loading…';
+  const SQL=await initSqlJs({locateFile:f=>SQLJS_BASE+f});
+  DB=new SQL.Database(new Uint8Array(await file.arrayBuffer()));
+
+  let meta={};
+  /* Audit-fix 2026-05-19: distinguish "no table" (acceptable — meta is
+     optional) from any other sqlite throw (corrupt file, locked db). */
+  try{ DB.exec("SELECT k,v FROM ez_meta")[0].values.forEach(([k,v])=>meta[k]=v);}
+  catch(err){
+    if(!/no such table/i.test(err.message||'')){
+      console.warn('ez_meta read failed:',err);
+    }
+  }
+  const built=meta.built_utc||'unknown';
+  $('meta').textContent=(meta.county||file.name)+' · built '+built;
+  const n=scalar("SELECT COUNT(*) FROM parcels");
+  $('loadedBanner').style.display='block';
+  $('loadedBanner').textContent='Loaded '+(meta.county||'county')+' — '+n+
+    ' parcels. Built '+built+'. '+(meta.grade||'');
+  /* Geometry check — fail loud if the SQLite has no spatial data. The user
+     can still do owner/PIN/address search but adjoiner + map won't work. */
+  try{
+    const withBbox = scalar("SELECT COUNT(*) FROM parcels "
+      +"WHERE bbox_minlat IS NOT NULL") || 0;
+    if(withBbox === 0){
+      $('loadedBanner').textContent += '  ⚠ NO GEOMETRY in this file — '
+        +'name/PIN/address search will work, but adjoiners and the map will not.';
+      $('loadedBanner').style.color = 'var(--warn)';
+    }
+  }catch(err){ /* bbox columns might not exist on a really old schema */ }
+  /* Detect multi-county shape — schema with a parcels.county column means
+     the user can scope. Fall back gracefully if the column isn't there.
+     Also detect column variants so older / sparser schemas (Pacific) still
+     work: not every county has parcel_alt, lat/lng, etc. */
+  MULTI_COUNTY = false;
+  HAS_PARCEL_ALT = false;
+  HAS_LATLNG = false;
+  HAS_SECTIONS = false;
+  try{
+    const cols = rows("PRAGMA table_info(parcels)").map(r=>r.name);
+    HAS_PARCEL_ALT = cols.includes('parcel_alt');
+    HAS_LATLNG     = cols.includes('lat') && cols.includes('lng');
+    if(cols.includes('county')){
+      MULTI_COUNTY = true;
+      const counties = rows("SELECT DISTINCT county FROM parcels "
+                           +"WHERE county IS NOT NULL ORDER BY county").map(r=>r.county);
+      const sel = $('countyPick');
+      sel.innerHTML = '<option value="">- pick a county -</option>'
+        + counties.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('');
+      $('countyPickWrap').style.display='block';
+      sel.addEventListener('change', () => {
+        ACTIVE_COUNTY = sel.value || null;
+        CAND = null;
+        $('meta').textContent = (ACTIVE_COUNTY || meta.county || file.name)
+          + ' . built ' + built
+          + (ACTIVE_COUNTY ? ' . scope: ' + ACTIVE_COUNTY : '');
+      });
+    }
+    HAS_SECTIONS = rows("SELECT name FROM sqlite_master "
+                       +"WHERE type='table' AND name='sections'").length > 0;
+  }catch(err){
+    console.warn('schema probe failed:', err);
+  }
+  unlock('step2');
+  initMap();
+});
+
+function scalar(q,p){const r=DB.exec(q,p);return r.length?r[0].values[0][0]:null;}
+function rows(q,p){
+  const r=DB.exec(q,p); if(!r.length) return [];
+  const c=r[0].columns;
+  return r[0].values.map(v=>Object.fromEntries(c.map((k,i)=>[k,v[i]])));
+}
+
+/* ---------------------------------------------------------------------------
+   STEP 2 — T/R cascade. Narrows CANDIDATES; never gates RESULTS.
+   ------------------------------------------------------------------------ */
+$('applyTRS').addEventListener('click',()=>{
+  const twp=parseInt($('twp').value,10), rng=parseInt($('rng').value,10);
+  const dir=$('rdir').value, sec=$('sec').value.trim();
+  if(isNaN(twp)||isNaN(rng)){alert('Enter township and range.');return;}
+
+  CAND=candidatesForTRS(twp,rng,dir,sec,false);
+  let msg='Candidate set: '+CAND.length+' parcels.';
+  if(CAND.length===0){
+    const wide=candidatesForTRS(twp,rng,dir,sec,true);
+    if(wide.length){CAND=wide;
+      msg='Nothing in that T/R — widened to the 8 neighbor townships: '
+         +wide.length+' parcels. Verify before use.';}
+    else msg='No parcels in that T/R or its neighbors. Check the entry.';
+  }
+  const tot=scalar("SELECT COUNT(*) FROM parcels")||1;
+  $('trsNote').innerHTML='<span class="candcount">'+esc(msg)+'</span> ('
+    +(100-Math.round(CAND.length/tot*100))+'% of the county off the table '
+    +'before any name search.)';
+  unlock('step3');
+});
+
+/* No-name path: the T/R alone is a valid finish. The ugly-folder case. */
+$('listAll').addEventListener('click',()=>{
+  if(!CAND){alert('Narrow by T/R first.');return;}
+  renderHits(CAND.slice(0,400).map(fid=>({fid,conf:null})),true);
+});
+
+/* Map a T/R[/S] to a parcel-fid candidate list via the sections grid and the
+   GPKG R-tree. widen=true => the 9-cell township block (entered + 8). */
+function candidatesForTRS(twp,rng,dir,sec,widen){
+  if(!HAS_SECTIONS){
+    /* Counties without a `sections` table (Pacific, Cowlitz, Mason in the
+       parcel-only build) cannot use T/R as a candidate filter. Surface this
+       in the UI rather than silently returning nothing. */
+    const box=$('trsNote');
+    if(box) box.innerHTML='<span class="candcount" style="color:var(--warn)">'
+      +'No sections table for this county — T/R filter unavailable. '
+      +'Use Owner / Address / Parcel# search instead.</span>';
+    return [];
+  }
+  /* Audit-fix 2026-05-19: whitelist `dir` and parameterize via bound values
+     rather than interpolating into SQL — even though `dir` currently comes
+     from a 2-option <select>, the audit doc treats any user input in a SQL
+     string concat as a finding regardless of current exploitability. */
+  if(dir!=='E' && dir!=='W'){
+    console.warn('range direction must be E or W, got:',dir);
+    return [];
+  }
+  const tLo=widen?twp-1:twp,tHi=widen?twp+1:twp;
+  const rLo=widen?rng-1:rng,rHi=widen?rng+1:rng;
+  let secClause = (sec && !widen)
+    ? " AND CAST(s.sec AS INTEGER)="+parseInt(sec,10) : "";
+  /* When the .gpkg is multi-county, scope to the chosen county so the T/R
+     filter does not reach across county lines. */
+  const countyClause = (MULTI_COUNTY && ACTIVE_COUNTY) ? " AND p.county=?" : "";
+  const sql=`
+    SELECT DISTINCT p.fid FROM parcels p
+    JOIN sections s
+      ON CAST(s.twp AS INTEGER) BETWEEN ${tLo} AND ${tHi}
+     AND CAST(s.rng AS INTEGER) BETWEEN ${rLo} AND ${rHi}
+     AND s.rng_dir=? ${secClause}
+    WHERE p.bbox_minlng<=s.bbox_maxlng AND p.bbox_maxlng>=s.bbox_minlng
+      AND p.bbox_minlat<=s.bbox_maxlat AND p.bbox_maxlat>=s.bbox_minlat
+      ${countyClause}`;
+  const bindParams = (MULTI_COUNTY && ACTIVE_COUNTY) ? [dir, ACTIVE_COUNTY] : [dir];
+  try{const r=DB.exec(sql,bindParams);return r.length?r[0].values.map(v=>v[0]):[];}
+  catch(err){
+    /* @STUB rtree table names vary by gpkg writer — confirm once on the real
+       build and hard-code. Audit-fix 2026-05-19: do NOT silently widen to the
+       whole county on failure (that contradicts fail-loud everywhere else).
+       Surface a banner and return [] so the user knows the T/R filter didn't
+       apply — they can then decide whether to widen on purpose. */
+    console.warn('rtree path failed:',err);
+    const box=$('trsNote');
+    if(box) box.innerHTML='<span class="candcount" style="color:var(--warn)">'
+      +'R-tree index not found in this GeoPackage — T/R filter cannot apply. '
+      +'Fix the factory output or pick a different .gpkg.</span>';
+    return [];
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   STEP 3 — search within the candidate set
+   ------------------------------------------------------------------------ */
+$('search').addEventListener('click',()=>{
+  const owner=$('qOwner').value.trim(), addr=$('qAddr').value.trim(),
+        pin=$('qPin').value.trim();
+  /* If the user has narrowed by T/R, that scope already applies. Otherwise
+     fall back to a county scope so the search doesn't reach across counties. */
+  let scope=(CAND&&CAND.length)?(" AND fid IN ("+CAND.join(',')+")"):"";
+  const countyExtra = (MULTI_COUNTY && ACTIVE_COUNTY && !(CAND&&CAND.length))
+    ? " AND county=?" : "";
+  const countyBind = (MULTI_COUNTY && ACTIVE_COUNTY && !(CAND&&CAND.length))
+    ? [ACTIVE_COUNTY] : [];
+  scope += countyExtra;
+  let hits=[];
+
+  if(pin){
+    /* parcel_alt is in the newer schemas (Lewis, Cowlitz, Wahkiakum, Mason).
+       Pacific's older schema lacks it. Build the WHERE clause accordingly. */
+    const whereCol = HAS_PARCEL_ALT
+      ? "(parcel_id=? OR parcel_alt=?)"
+      : "parcel_id=?";
+    const bindCols = HAS_PARCEL_ALT ? [pin, pin] : [pin];
+    hits=rows("SELECT fid, parcel_id, owner, situs FROM parcels WHERE "
+      +whereCol+scope, [...bindCols, ...countyBind]).map(r=>({...r,conf:1}));
+  }else if(addr){
+    hits=rows("SELECT fid, parcel_id, owner, situs FROM parcels "
+      +"WHERE UPPER(situs) LIKE ?"+scope,
+      ['%'+addr.toUpperCase()+'%',...countyBind])
+      .map(r=>({...r,conf:1}));
+  }else if(owner){
+    const norm=normName(owner);
+    const pool=rows("SELECT fid, parcel_id, owner, owner_norm, situs FROM parcels "
+      +"WHERE 1=1"+scope, countyBind.length?countyBind:undefined);
+    hits=pool.map(r=>({...r,conf:score(norm,r.owner_norm||normName(r.owner||''))}))
+      .filter(r=>r.conf>=CONFIDENCE_MIN)        /* FAIL LOUD: drop the rest */
+      .sort((a,b)=>b.conf-a.conf).slice(0,40);
+  }else{alert('Enter a name, address, or parcel number.');return;}
+  renderHits(hits,false);
+});
+
+function normName(s){
+  return (s||'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
+/* @STUB token-overlap scorer. Replace with Jaro-Winkler / rapidfuzz port. */
+function score(q,cand){
+  if(!q||!cand) return 0;
+  if(cand.indexOf(q)>=0) return 0.97;
+  const qt=q.split(' '), ct=new Set(cand.split(' '));
+  let hit=qt.filter(t=>ct.has(t)).length;
+  return hit/Math.max(qt.length,1)*0.9;
+}
+
+function renderHits(hits,isList){
+  const box=$('results'); box.innerHTML='';
+  if(!hits.length){
+    box.innerHTML='<div class="banner warn">No match at or above the '
+      +'confidence threshold. Nothing returned — by design. Widen the T/R, '
+      +'try the address, or check the spelling.</div>';
+    return;
+  }
+  if(isList) box.innerHTML='<div class="note">'+hits.length
+    +' parcels in the T/R. Pick the client.</div>';
+  hits.forEach(h=>{
+    const rec=h.parcel_id?h:rows("SELECT fid, parcel_id, owner, situs FROM parcels "
+      +"WHERE fid=?",[h.fid])[0];
+    const d=document.createElement('div');
+    d.className='hit';
+    d.innerHTML='<span class="pin">'+esc(rec.parcel_id)+'</span>'
+      +'<span class="own">'+esc(rec.owner||'—')
+      +(rec.situs?' · '+esc(rec.situs):'')+'</span>'
+      +(h.conf!=null?'<span class="conf '+(h.conf>=.8?'hi':'lo')+'">'
+        +Math.round(h.conf*100)+'%</span>':'');
+    d.onclick=()=>selectSubject(rec.fid);
+    box.appendChild(d);
+  });
+}
+
+/* ---------------------------------------------------------------------------
+   RESULT SCREEN — the finish line. Snapshot + adjoiner + per-parcel docs,
+   plus the paper-sketch map. No county visit for the research phase.
+   ------------------------------------------------------------------------ */
+function selectSubject(fid){
+  const p=rows("SELECT * FROM parcels WHERE fid=?",[fid])[0];
+  if(!p) return;
+  const adj=adjoiners(fid,p);
+  unlock('resultCard');
+  $('resultBody').innerHTML =
+    snapshotHTML(p) + adjoinerHTML(adj) + composeSeedHTML(p,adj)
+    + docDrawerHTML(p,'client');
+  wireAdjoinerClicks(adj);
+  wireComposeSeed(p,adj);
+  drawMap(p,adj);
+  $('resultCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function snapshotHTML(p){
+  const money=v=>v?'$'+Number(v).toLocaleString():'—';
+  const trs = p.trs_key || p.trs || null;
+  let rows = [
+    ['Owner',  esc(p.owner||'—')],
+    ['Situs',  esc(p.situs||'— (bare land)')],
+  ];
+  if(p.acres != null)     rows.push(['Acres',     esc(p.acres)]);
+  if(trs)                 rows.push(['T/R/S',     esc(trs)]);
+  if(p.use_desc != null)  rows.push(['Use',       esc(p.use_desc)]);
+  if(p.val_land != null)  rows.push(['Land val',  money(p.val_land)]);
+  if(p.val_total != null) rows.push(['Total val', money(p.val_total)]);
+  if(p.legal)             rows.push(['Legal',     esc(p.legal)]);
+  return '<div class="res-snap">'
+    +'<div class="pinbig">'+esc(p.parcel_id)+'</div>'
+    +'<dl>'
+    + rows.map(([k,v]) => '<dt>'+k+'</dt><dd>'+v+'</dd>').join('')
+    +'</dl></div>';
+}
+
+/* @STUB adjoiner direction: centroid-bearing of each neighbor off the
+   subject centroid. Good enough to label NE/E/SE… Upgrade to true shared-
+   edge adjacency using the gpkg geometry blobs. */
+function _ll(p){
+  /* Resolve lat/lng for a parcel. Newer schemas have explicit lat/lng;
+     older Pacific schema doesn't. Fall back to bbox centroid in that case. */
+  let lat = (p.lat != null) ? p.lat
+          : (p.bbox_minlat != null && p.bbox_maxlat != null
+              ? (p.bbox_minlat + p.bbox_maxlat) / 2 : null);
+  let lng = (p.lng != null) ? p.lng
+          : (p.bbox_minlng != null && p.bbox_maxlng != null
+              ? (p.bbox_minlng + p.bbox_maxlng) / 2 : null);
+  return {lat, lng};
+}
+function adjoiners(fid,p){
+  // neighbors = parcels whose bbox intersects the subject bbox, buffered.
+  let nb=[];
+  try{
+    /* Older schemas (Pacific) don't have lat/lng columns. Pull only what
+       exists; _ll() will fall back to bbox centroid when needed. */
+    const latlngCols = HAS_LATLNG ? ", p2.lat, p2.lng" : "";
+    nb=rows(`
+      SELECT p2.fid, p2.parcel_id, p2.owner${latlngCols},
+             p2.bbox_minlat, p2.bbox_minlng, p2.bbox_maxlat, p2.bbox_maxlng
+      FROM parcels p1
+      JOIN parcels p2
+        ON p2.bbox_minlng<=p1.bbox_maxlng+0.0008
+       AND p2.bbox_maxlng>=p1.bbox_minlng-0.0008
+       AND p2.bbox_minlat<=p1.bbox_maxlat+0.0008
+       AND p2.bbox_maxlat>=p1.bbox_minlat-0.0008
+      WHERE p1.fid=? AND p2.fid<>?`,[fid,fid]);
+  }catch(err){console.warn('adjoiner bbox query failed:',err);}
+  const pll=_ll(p);
+  const cx=pll.lng, cy=pll.lat;
+  /* Audit-fix 2026-05-19: scale longitude by cos(lat) so the bearing and
+     distance math reflect actual distance on the ground. At Lewis County
+     latitude (~46.5°N) a degree of longitude is ~0.69× a degree of
+     latitude, which without this fix biases "nearest" toward the N–S axis. */
+  const lonScale = Math.cos((cy||0) * Math.PI/180);
+  const slot={};
+  nb.forEach(n=>{
+    const nll=_ll(n);
+    if(nll.lng==null||nll.lat==null) return;
+    n.lat=nll.lat; n.lng=nll.lng;   // bake the resolved coords onto the record
+    const dx=(nll.lng-cx)*lonScale;
+    const dy=nll.lat-cy;
+    const ang=Math.atan2(dy,dx)*180/Math.PI;
+    const idx=Math.round(((90-ang)%360+360)%360/45)%8;   // 0=N,1=NE,…
+    const d=DIRS8[idx];
+    const dist=Math.hypot(dx,dy);
+    if(!slot[d]||dist<slot[d]._d){slot[d]={...n,_d:dist};}
+  });
+  return slot;
+}
+
+function adjoinerHTML(slot){
+  let rows8=DIRS8.map(d=>{
+    const n=slot[d];
+    return '<tr><td class="dir">'+d+'</td>'
+      +(n?'<td class="tpn" data-pin="'+esc(n.parcel_id)+'" data-fid="'+n.fid+'">'
+            +esc(n.parcel_id)+'</td><td class="own">'+esc(n.owner||'—')+'</td>'
+        :'<td class="empty" colspan="2">no adjoining parcel found</td>')
+      +'</tr>';
+  }).join('');
+  // copyable plain-text block for the drafted sheet
+  let txt=DIRS8.map(d=>d.padEnd(3)+' '
+    +(slot[d]?slot[d].parcel_id:'(none)')).join('\n');
+  return '<div id="adjoiner"><h2 style="font-size:11px;color:var(--accent);'
+    +'margin:14px 0 4px;letter-spacing:.1em">ADJOINER TPNs — primary product</h2>'
+    +'<table>'+rows8+'</table>'
+    +'<pre class="copy" id="adjCopy">'+esc(txt)+'</pre>'
+    +'<button class="ghost" onclick="navigator.clipboard.writeText('
+    +"document.getElementById('adjCopy').textContent)"
+    +'">Copy block</button>'
+    +'<div class="disclaim">Direction labels are approximate, from assessor '
+    +'parcel centroids. Verify orientation against the drafted sheet.</div>'
+    +'</div>';
+}
+
+function wireAdjoinerClicks(slot){
+  document.querySelectorAll('#adjoiner td.tpn').forEach(td=>{
+    td.onclick=()=>{
+      const fid=+td.dataset.fid;
+      const p=rows("SELECT * FROM parcels WHERE fid=?",[fid])[0];
+      // append/replace this neighbor's document drawer below the block
+      let old=$('nbDocs'); if(old) old.remove();
+      const div=document.createElement('div');
+      div.id='nbDocs';
+      div.innerHTML='<h2 style="font-size:11px;color:var(--accent);'
+        +'margin:14px 0 4px;letter-spacing:.1em">NEIGHBOR — '+esc(p.parcel_id)
+        +'</h2>'+docDrawerHTML(p,'neighbor');
+      $('adjoiner').appendChild(div);
+    };
+  });
+}
+
+/* ---------------------------------------------------------------------------
+   COMPOSE SEED — Phase 5 handshake to BUTLER STYLE (clipboard-only). Bundles
+   the parcel facts that BUTLER STYLE's DRAFT mode will pre-fill into a
+   playbook §2 title-block template. Schema is intentionally narrow: only the
+   facts EZ Lookup actually knows from the assessor fabric. Aliquot stack and
+   T/R need the licensed surveyor to confirm — surfaced as null so BUTLER
+   STYLE asks rather than guesses.
+   ------------------------------------------------------------------------ */
+function composeSeed(p,slot){
+  return {
+    schema: 'ez_lookup_compose_seed/v1',
+    generated_utc: new Date().toISOString(),
+    county: (function(){
+      const c = scalar("SELECT v FROM ez_meta WHERE k='county'");
+      return c || null;
+    })(),
+    client_parcel: {
+      pin: p.parcel_id || null,
+      owner: p.owner || null,
+      situs: p.situs || null,
+      acres: p.acres != null ? p.acres : null,
+      use: p.use_desc || null
+    },
+    // T/R/S and aliquot stack stay null — assessor fabric doesn't carry the
+    // operative legal-description hierarchy. BUTLER STYLE prompts the user.
+    township: null,
+    township_dir: null,
+    range: null,
+    range_dir: null,
+    section: null,
+    aliquot_stack: null,
+    platted_subdivision: null,
+    adjoiners: Object.fromEntries(
+      DIRS8.map(d => [d, slot[d] ? {
+        pin: slot[d].parcel_id || null,
+        owner: slot[d].owner || null
+      } : null])
+    )
+  };
+}
+function composeSeedHTML(p,slot){
+  return '<div id="composeSeed" style="border:1px dashed var(--accent);'
+    +'border-radius:3px;margin-top:14px;padding:10px 12px;'
+    +'background:var(--panel2)">'
+    +'<div style="font-size:10.5px;color:var(--accent);text-transform:'
+    +'uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:5px">'
+    +'Compose seed &rarr; BUTLER STYLE</div>'
+    +'<div style="font-size:11px;color:var(--dim);margin-bottom:7px">'
+    +'Hand this parcel package to BUTLER STYLE’s DRAFT mode. '
+    +'Clipboard-only — paste into BUTLER STYLE’s seed input.</div>'
+    +'<button class="ghost" id="copyComposeSeed">Copy compose seed (JSON)</button>'
+    +'</div>';
+}
+function wireComposeSeed(p,slot){
+  const btn = $('copyComposeSeed');
+  if(!btn) return;
+  btn.addEventListener('click', () => {
+    const seed = composeSeed(p,slot);
+    navigator.clipboard.writeText(JSON.stringify(seed,null,2)).then(()=>{
+      const orig = btn.textContent;
+      btn.textContent = 'copied ✓';
+      setTimeout(()=>{ btn.textContent = orig; }, 1000);
+    }, err => alert('Clipboard write failed: ' + err.message));
+  });
+}
+
+/* Per-parcel document set. Routes to the deed (pre-run link + copyable AFN),
+   flags easements and liens. Flagging is routing — the tool never reads or
+   judges a document; that is the surveyor's licensed call. */
+function docDrawerHTML(p,kind){
+  const pin=p.parcel_id, owner=p.owner||'';
+  const routes = currentRoutes();
+  /* Surface which recorder platform the links route to. Lewis is quickdocs;
+     Pacific is countygovernmentrecords.com; Grays Harbor's Eagle portal has
+     no deep-link yet; etc. The user should always know which county website
+     they're about to open — no surprises, no wrong-county routing. */
+  const routeLabel = routes === RECORDER_ROUTES._UNKNOWN
+    ? 'no county selected — recorder route unavailable'
+    : (new URL(routes.base).hostname);
+
+  return '<div class="docrow"><div class="dh">Deed — county auditor</div>'
+    +'<a href="'+DEEDLINK.byPin(pin)+'" target="_blank" rel="noopener noreferrer">'
+      +'Open recorder — search pre-run by parcel ↗</a><br>'
+    +'<a href="'+DEEDLINK.byName(owner)+'" target="_blank" rel="noopener noreferrer">'
+      +'Open recorder — search pre-run by grantor name ↗</a>'
+    +'<div class="afn" title="click to copy" onclick="navigator.clipboard.'
+      +"writeText('"+esc(pin).replace(/'/g,"")+"')"+'">'
+      +'AFN lookup key (copy): '+esc(pin)+'</div>'
+    +'<div class="disclaim">Routes to <b>'+esc(routeLabel)+'</b>. '
+      +esc(routes.note)+' AFN key is the fallback.'
+    +'</div></div>'
+
+    +'<div class="docrow"><div class="dh">Easements affecting this parcel</div>'
+    +'<div class="flag">⚑ Routed, not read. Search easements / CC&Rs for this '
+      +'parcel via the recorder link above.</div>'
+    +'<div class="disclaim">The tool flags that easement documents may exist '
+      +'and routes to them. Reading what an easement encumbers is licensed '
+      +'work — the surveyor does that.</div></div>'
+
+    +'<div class="docrow"><div class="dh">Liens / judgments</div>'
+    +'<div class="flag">⚑ Routed, not read. Check judgments &amp; liens '
+      +'against the owner name via the recorder link above.</div></div>'
+
+    +'<div class="docrow"><div class="dh">Assessor record</div>'
+    +'<a href="'+ASSESSORLINK(pin)+'" target="_blank" rel="noopener noreferrer">'
+      +'Open assessor parcel detail ↗</a></div>';
+}
+
+/* ---------------------------------------------------------------------------
+   MAP — paper-sketch parcel view. Leaflet, NO satellite basemap.
+   Imagery belongs with Horizon 2 (corrected linework). See header CHALK LINE.
+   ------------------------------------------------------------------------ */
+function initMap(){
+  if(MAP) return;
+  MAP=L.map('map',{zoomControl:true,attributionControl:false})
+       .setView([46.57,-122.9],11);          // Lewis County, rough center
+  /* deliberately NO L.tileLayer satellite/OSM — paper background only.
+     Horizon 2 hook: a tile layer drops in HERE, with corrected linework. */
+}
+
+/* Draw subject + neighbors from parcel centroids as a reference sketch.
+   @STUB centroids only — real build reads polygon geometry from the gpkg
+   geom blob (parse WKB) and draws true parcel outlines. */
+function drawMap(p,slot){
+  initMap();
+  ['subject','neighbors'].forEach(k=>{
+    if(LAYERS[k]){MAP.removeLayer(LAYERS[k]);LAYERS[k]=null;}
+  });
+  const pll=_ll(p);
+  if(pll.lat==null||pll.lng==null){
+    $('maphint').textContent='No coordinate on this parcel — map skipped.';
+    return;
+  }
+  const sub=[pll.lat,pll.lng];
+  LAYERS.subject=L.circleMarker(sub,{radius:9,color:'#c8553d',weight:3,
+    fillColor:'#d98e2b',fillOpacity:.5}).addTo(MAP)
+    .bindTooltip('CLIENT — '+p.parcel_id,{permanent:true,direction:'top'});
+  const ng=[];
+  DIRS8.forEach(d=>{
+    const n=slot[d]; if(!n) return;
+    const nll=_ll(n); if(nll.lat==null) return;
+    const m=L.circleMarker([nll.lat,nll.lng],{radius:7,
+      color:'#5a4a2a',weight:2,fillColor:'#9a8f73',fillOpacity:.45})
+      .bindTooltip(d+' — '+n.parcel_id,{direction:'top'});
+    m.on('click',()=>{
+      const np=rows("SELECT * FROM parcels WHERE fid=?",[n.fid])[0];
+      let old=$('nbDocs'); if(old) old.remove();
+      const div=document.createElement('div'); div.id='nbDocs';
+      div.innerHTML='<h2 style="font-size:11px;color:var(--accent);'
+        +'margin:14px 0 4px">NEIGHBOR — '+esc(np.parcel_id)+'</h2>'
+        +docDrawerHTML(np,'neighbor');
+      $('adjoiner').appendChild(div);
+    });
+    ng.push(m);
+  });
+  LAYERS.neighbors=L.layerGroup(ng).addTo(MAP);
+  const grp=L.featureGroup([LAYERS.subject,...ng]);
+  MAP.fitBounds(grp.getBounds().pad(0.4));
+  $('maphint').textContent='Click any marker for that parcel\u2019s documents. '
+    +'Reference sketch — not to scale.';
+}
+/* ---------------------------------------------------------------------------
+   Keyboard ergonomics (audit-fix 2026-05-19) — Enter fires the right action
+   on each input so the workflow runs without a mouse. Per the suite ethos in
+   EZ_SUITE_MASTER §1: "Enter adds a new row; Tab moves between fields."
+   ------------------------------------------------------------------------ */
+['twp','rng','sec'].forEach(id=>{
+  $(id).addEventListener('keydown',ev=>{
+    if(ev.key==='Enter'){ ev.preventDefault(); $('applyTRS').click(); }
+  });
+});
+['qOwner','qAddr','qPin'].forEach(id=>{
+  $(id).addEventListener('keydown',ev=>{
+    if(ev.key==='Enter'){ ev.preventDefault(); $('search').click(); }
+  });
+});
+</script>
+</body>
+</html>

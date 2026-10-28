@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PLEBYAN — Field Tools for Surveyors</title>
+  <meta name="description" content="Single-file HTML tools for land surveyors. No subscriptions, no internet, no login required.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:          #0a0d10;
+      --bg-grid:     #10151a;
+      --panel:       #11161b;
+      --panel-2:     #161c22;
+      --panel-3:     #1b232b;
+      --border:      #1f2830;
+      --border-hot:  #2a3845;
+      --fg:          #f4f2ed;
+      --fg-dim:      #b2bfcc;
+      --fg-mute:     #8896a6;
+      --teal:        #00e5d1;
+      --teal-dim:    #00b3a3;
+      --teal-soft:   rgba(0,229,209,0.10);
+      --amber:       #ffb547;
+      --amber-soft:  rgba(255,181,71,0.08);
+      --radius-md: 6px;
+      --radius-lg: 10px;
+      --font-sans: 'Sora', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      color: var(--fg);
+      background: var(--bg);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, var(--bg-grid) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--bg-grid) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.45;
+      mask-image: radial-gradient(ellipse at center, black 20%, transparent 85%);
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 96px;
+    }
+
+    /* ── NAV ──────────────────────────────────────────────── */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 80px;
+    }
+    .nav-logo {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--teal);
+      letter-spacing: -0.02em;
+      text-decoration: none;
+    }
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fg-mute);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--fg); }
+
+    /* ── HERO ─────────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 0 0 96px;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .hero-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .hero-eyebrow::before,
+    .hero-eyebrow::after {
+      content: '';
+      width: 40px;
+      height: 1px;
+      background: var(--teal);
+      opacity: 0.4;
+    }
+    .hero-title {
+      font-size: clamp(38px, 6vw, 64px);
+      font-weight: 700;
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
+    }
+    .hero-title .accent { color: var(--teal); }
+    .hero-sub {
+      font-size: 18px;
+      color: var(--fg-dim);
+      line-height: 1.65;
+      margin-bottom: 40px;
+      max-width: 580px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .hero-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    .pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border-hot);
+      color: var(--fg-dim);
+      letter-spacing: 0.04em;
+    }
+    .pill.teal { border-color: rgba(0,229,209,0.3); color: var(--teal); background: var(--teal-soft); }
+
+    /* ── SECTION HEADER ───────────────────────────────────── */
+    .section { margin-bottom: 72px; }
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+      margin-bottom: 28px;
+    }
+    .section-name {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--teal);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .section-desc { font-size: 13px; color: var(--fg-mute); }
+
+    /* ── PRODUCT GRID ─────────────────────────────────────── */
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    .product-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.15s;
+    }
+    .product-card:hover { border-color: var(--border-hot); }
+
+    /* ── VIDEO AREA ───────────────────────────────────────── */
+    .video-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: var(--panel-3);
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    /* Placeholder state — shown when no YouTube ID is set */
+    .video-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--fg-mute);
+    }
+    .video-placeholder .play-ring {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      border: 2px solid var(--border-hot);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--fg-mute);
+      font-size: 18px;
+    }
+    .video-placeholder .play-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+    }
+
+    /* Ready state — shown when a YouTube ID is present */
+    .video-thumb {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+    }
+    .video-thumb .play-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.35);
+      transition: background 0.2s;
+    }
+    .video-thumb:hover .play-overlay { background: rgba(0,0,0,0.15); }
+    .video-thumb .play-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(0,229,209,0.90);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .video-thumb:hover .play-btn { transform: scale(1.08); background: var(--teal); }
+    .video-thumb .play-btn::after {
+      content: '';
+      border-left: 18px solid #0a0d10;
+      border-top: 11px solid transparent;
+      border-bottom: 11px solid transparent;
+      margin-left: 4px;
+    }
+
+    /* Active iframe state — injected by JS on click */
+    .video-wrap iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    /* ── CARD BODY ────────────────────────────────────────── */
+    .card-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+    }
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .card-name {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--fg);
+      letter-spacing: 0.01em;
+    }
+    .card-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--teal-soft);
+      color: var(--teal);
+      border: 1px solid rgba(0,229,209,0.20);
+      white-space: nowrap;
+      margin-top: 3px;
+    }
+    .card-badge.amber {
+      background: var(--amber-soft);
+      color: var(--amber);
+      border-color: rgba(255,181,71,0.20);
+    }
+    .card-desc {
+      font-size: 13px;
+      color: var(--fg-mute);
+      line-height: 1.55;
+    }
+    .card-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+    .card-features li {
+      font-size: 12px;
+      color: var(--fg-dim);
+      padding-left: 16px;
+      position: relative;
+      line-height: 1.4;
+    }
+    .card-features li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--teal);
+      font-family: var(--font-mono);
+    }
+
+    /* ── CARD FOOTER ──────────────────────────────────────── */
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .card-price {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--fg);
+      letter-spacing: -0.02em;
+    }
+    .card-price .price-once {
+      font-size: 11px;
+      color: var(--fg-mute);
+      font-weight: 400;
+      margin-left: 4px;
+    }
+    .btn-buy {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--teal-soft);
+      color: var(--teal);
+      border: 1px solid rgba(0,229,209,0.25);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 9px 18px;
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .btn-buy:hover {
+      background: rgba(0,229,209,0.18);
+      border-color: rgba(0,229,209,0.45);
+      transform: translateY(-1px);
+    }
+
+    /* ── WHY SECTION ──────────────────────────────────────── */
+    .why-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+    }
+    .why-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 22px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .why-icon { font-size: 26px; }
+    .why-title {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    .why-desc { font-size: 12px; color: var(--fg-mute); line-height: 1.55; }
+
+    /* ── FOOTER ───────────────────────────────────────────── */
+    .site-footer {
+      margin-top: 80px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-mute);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .footer-link {
+      color: var(--fg-mute);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .footer-link:hover { color: var(--teal); }
+
+    /* ── RESPONSIVE ───────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .page { padding: 0 16px 64px; }
+      .nav { margin-bottom: 52px; }
+      .hero { padding-bottom: 64px; }
+      .nav-links { display: none; }
+      .product-grid { grid-template-columns: 1fr; }
+      .why-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- NAV -->
+    <nav class="nav">
+      <a class="nav-logo" href="/">PLEBYAN</a>
+      <ul class="nav-links">
+        <li><a href="#ez-suite">EZ Suite</a></li>
+        <li><a href="#butler-tools">Butler Tools</a></li>
+        <li><a href="#why">Why PLEBYAN</a></li>
+        <li><a href="mailto:derichawes10@gmail.com">Contact</a></li>
+      </ul>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-eyebrow">Professional Surveying Tools</div>
+      <h1 class="hero-title">
+        Built for the field.<br>
+        <span class="accent">Works everywhere.</span>
+      </h1>
+      <p class="hero-sub">
+        Single-file HTML tools for land surveyors. No subscriptions,
+        no internet required, no login. Download it, save it to a USB,
+        open it on any computer. It just works.
+      </p>
+      <div class="hero-pills">
+        <span class="pill teal">Works offline</span>
+        <span class="pill teal">No login required</span>
+        <span class="pill teal">Single HTML file</span>
+        <span class="pill">Field-tested in WA State</span>
+        <span class="pill">Buy once, own forever</span>
+      </div>
+    </section>
+
+    <!-- EZ SUITE -->
+    <section class="section" id="ez-suite">
+      <div class="section-header">
+        <span class="section-name">EZ Suite</span>
+        <span class="section-desc">Core field tools for land surveyors</span>
+      </div>
+      <div class="product-grid">
+
+        <!-- EZ TRAV -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">EZ TRAV</span>
+              <span class="card-badge">v6.14</span>
+            </div>
+            <p class="card-desc">The core traverse calculator. Built for PLS field work from the ground up.</p>
+            <ul class="card-features">
+              <li>Bearing/distance or lat-dep entry</li>
+              <li>Closure analysis and precision ratio</li>
+              <li>Compass rule and transit rule adjustment</li>
+              <li>Print-ready field sheets</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$39 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/EZTRAV-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- EZ DOC -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">EZ DOC</span>
+              <span class="card-badge">v7.2</span>
+            </div>
+            <p class="card-desc">Legal description generator. Metes-and-bounds from traverse data, formatted for county recording.</p>
+            <ul class="card-features">
+              <li>BLA, ALTA, and boundary description formats</li>
+              <li>Auto-formats to recording standards</li>
+              <li>Export to PDF or copy text</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$39 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/EZDOC-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- EZ LOOKUP -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">EZ LOOKUP</span>
+              <span class="card-badge">v2</span>
+            </div>
+            <p class="card-desc">Parcel and property lookup by parcel number. Cross-reference county assessor data fast.</p>
+            <ul class="card-features">
+              <li>Ownership and legal description pull</li>
+              <li>Fast parcel number search</li>
+              <li>Works with WA county assessor data</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$19 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/EZLOOKUP-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- EZ SCAN -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">EZ SCAN</span>
+              <span class="card-badge">v1.0</span>
+            </div>
+            <p class="card-desc">Document capture for field records, as-builts, and boundary monument photos.</p>
+            <ul class="card-features">
+              <li>Camera capture from any device</li>
+              <li>As-built and record sheet logging</li>
+              <li>Export bundle for project files</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$19 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/EZSCAN-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- EZ MAP -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">EZ MAP</span>
+              <span class="card-badge">v1.0</span>
+            </div>
+            <p class="card-desc">Field mapping and parcel boundary visualization. Plot traverse points and view acreage.</p>
+            <ul class="card-features">
+              <li>Plot traverse points on a canvas</li>
+              <li>Parcel shape and acreage display</li>
+              <li>Works completely offline</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$19 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/EZMAP-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- EZ MOBILE -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">EZ MOBILE</span>
+              <span class="card-badge">v1</span>
+            </div>
+            <p class="card-desc">Mobile-first field tool designed for phone use with gloves on.</p>
+            <ul class="card-features">
+              <li>Large tap targets for field conditions</li>
+              <li>Offline — save to phone home screen</li>
+              <li>Syncs data back to EZ TRAV</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$19 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/EZMOBILE-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- EZ FLOOD CERT -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">EZ FLOOD CERT</span>
+              <span class="card-badge amber">v0.1 beta</span>
+            </div>
+            <p class="card-desc">Elevation certificate workflows and FEMA flood zone documentation.</p>
+            <ul class="card-features">
+              <li>FEMA EC form guidance built in</li>
+              <li>Flood zone reference lookups</li>
+              <li>Beta — updates included free</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$19 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/EZFLOOD-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- EZ ASK -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">EZ ASK</span>
+              <span class="card-badge">v1</span>
+            </div>
+            <p class="card-desc">AI-powered surveying assistant. Ask anything about codes, calculations, or procedures.</p>
+            <ul class="card-features">
+              <li>WA State surveying standards built in</li>
+              <li>Code, calculation, and procedure questions</li>
+              <li>No API key required to start</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$29 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/EZASK-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- BUTLER TOOLS -->
+    <section class="section" id="butler-tools">
+      <div class="section-header">
+        <span class="section-name">Butler Tools</span>
+        <span class="section-desc">Office, bidding, and job management</span>
+      </div>
+      <div class="product-grid">
+
+        <!-- TIMESHEET -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">TIMESHEET</span>
+              <span class="card-badge">v13</span>
+            </div>
+            <p class="card-desc">Field crew time tracking with job codes, daily logs, and printable payroll sheets.</p>
+            <ul class="card-features">
+              <li>Hourly + daily crew logging</li>
+              <li>Multiple job codes per day</li>
+              <li>Print-ready timesheets for payroll</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$29 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/TIMESHEET-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- OFFSET SHEET -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">OFFSET SHEET</span>
+              <span class="card-badge">v8</span>
+            </div>
+            <p class="card-desc">Offset and reference stake calculations with printable field sheets.</p>
+            <ul class="card-features">
+              <li>Offset distance and direction math</li>
+              <li>Reference stake layout sheets</li>
+              <li>Print-ready for crew use</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$29 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/OFFSET-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- BID TEMPLATE -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">BID TEMPLATE</span>
+              <span class="card-badge">v2</span>
+            </div>
+            <p class="card-desc">Proposal generator that pulls job scope into a professional PDF quote.</p>
+            <ul class="card-features">
+              <li>Scope line items with unit pricing</li>
+              <li>Client-ready PDF output</li>
+              <li>Reusable templates per job type</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$29 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/BIDTEMPLATE-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- JOB BOARD -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">JOB BOARD</span>
+              <span class="card-badge">v2</span>
+            </div>
+            <p class="card-desc">Active job tracker — client, status, and schedule at a glance.</p>
+            <ul class="card-features">
+              <li>All active jobs in one view</li>
+              <li>Status: open, active, invoiced, closed</li>
+              <li>Client and contact lookup</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$29 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/JOBBOARD-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- JOB CARD -->
+        <div class="product-card">
+          <div class="video-wrap" data-ytid="">
+            <div class="video-placeholder">
+              <div class="play-ring">▶</div>
+              <span class="play-label">Demo video coming soon</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-name">JOB CARD</span>
+              <span class="card-badge">v1</span>
+            </div>
+            <p class="card-desc">Single-job summary card for client handoffs and permanent file records.</p>
+            <ul class="card-features">
+              <li>Clean one-page job summary</li>
+              <li>Client + parcel info combined</li>
+              <li>Printable for the project folder</li>
+            </ul>
+            <div class="card-footer">
+              <span class="card-price">$19 <span class="price-once">one-time</span></span>
+              <a class="btn-buy" href="https://gumroad.com/l/JOBCARD-PLACEHOLDER" target="_blank">Buy →</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- WHY PLEBYAN -->
+    <section class="section" id="why">
+      <div class="section-header">
+        <span class="section-name">Why PLEBYAN</span>
+        <span class="section-desc">No-nonsense tools for people who do real work</span>
+      </div>
+      <div class="why-grid">
+        <div class="why-card">
+          <span class="why-icon">📁</span>
+          <div class="why-title">Single HTML file</div>
+          <div class="why-desc">One file. Save it anywhere — USB, Desktop, Google Drive, a burned CD. Runs in any browser.</div>
+        </div>
+        <div class="why-card">
+          <span class="why-icon">📡</span>
+          <div class="why-title">Works offline</div>
+          <div class="why-desc">No internet after download. No APIs calling home. Works in a truck in the woods.</div>
+        </div>
+        <div class="why-card">
+          <span class="why-icon">🔓</span>
+          <div class="why-title">No login ever</div>
+          <div class="why-desc">No account, no password, no subscription to forget about. You buy it, you own it.</div>
+        </div>
+        <div class="why-card">
+          <span class="why-icon">🔧</span>
+          <div class="why-title">Built by surveyors</div>
+          <div class="why-desc">Every tool came out of real field work in Washington State. If it's in there, someone needed it.</div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <span>PLEBYAN · Butler Surveying Tools</span>
+      <div style="display:flex; gap: 20px;">
+        <a class="footer-link" href="mailto:derichawes10@gmail.com">Contact</a>
+        <a class="footer-link" href="https://hawes.plebyan.com">Hawes History</a>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    // Click-to-load YouTube embeds.
+    // Set data-ytid="YOUTUBE_VIDEO_ID" on any .video-wrap to activate.
+    document.querySelectorAll('.video-wrap[data-ytid]').forEach(function(wrap) {
+      var ytid = wrap.getAttribute('data-ytid');
+      if (!ytid) return; // no video yet — placeholder stays
+
+      // Swap placeholder for thumbnail + play button
+      var thumb = document.createElement('div');
+      thumb.className = 'video-thumb';
+      thumb.style.backgroundImage = 'url(https://img.youtube.com/vi/' + ytid + '/maxresdefault.jpg)';
+      thumb.innerHTML = '<div class="play-overlay"><div class="play-btn"></div></div>';
+
+      wrap.innerHTML = '';
+      wrap.appendChild(thumb);
+
+      thumb.addEventListener('click', function() {
+        var iframe = document.createElement('iframe');
+        iframe.src = 'https://www.youtube.com/embed/' + ytid + '?autoplay=1&rel=0';
+        iframe.allow = 'autoplay; encrypted-media; picture-in-picture';
+        iframe.allowFullscreen = true;
+        wrap.innerHTML = '';
+        wrap.appendChild(iframe);
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Butler Surveying — Bid Template</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,700;9..144,900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4f1ea;
+    --paper-dim: #ebe6db;
+    --ink: #1a1f2c;
+    --ink-soft: #4a5165;
+    --rule: #1a1f2c;
+    --rule-soft: #a8a397;
+    --accent: #b8451f;       /* surveyor cap red */
+    --accent-2: #2d4a3e;     /* timber green */
+    --warn: #c97a1f;
+    --grid: rgba(26, 31, 44, 0.06);
+    --shadow: 0 1px 0 rgba(26,31,44,0.08), 0 8px 24px -16px rgba(26,31,44,0.18);
+  }
+
+  * { box-sizing: border-box; }
+
+  /* ---------- Paged media (Sharp MX-3071, US Letter) ----------
+     0.2in vertical / 0.3in horizontal = the firm's known-good Sharp
+     safe preset (inside the ~5mm void band; MD recommends >=0.20 vertical
+     unless Extended Printable Area is on). All 16 margin boxes declared
+     empty so Chrome drops its default URL/date/page-number header & footer. */
+  @page {
+    size: letter portrait;
+    margin: 0.2in 0.3in;
+    @top-left-corner     { content: ""; }
+    @top-left            { content: ""; }
+    @top-center          { content: ""; }
+    @top-right           { content: ""; }
+    @top-right-corner    { content: ""; }
+    @bottom-left-corner  { content: ""; }
+    @bottom-left         { content: ""; }
+    @bottom-center       { content: ""; }
+    @bottom-right        { content: ""; }
+    @bottom-right-corner { content: ""; }
+    @left-top            { content: ""; }
+    @left-middle         { content: ""; }
+    @left-bottom         { content: ""; }
+    @right-top           { content: ""; }
+    @right-middle        { content: ""; }
+    @right-bottom        { content: ""; }
+  }
+
+  html, body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 32px 28px 80px;
+  }
+
+  /* ---------- Letterhead ---------- */
+  header.letterhead {
+    border: 1.5px solid var(--rule);
+    background: var(--paper);
+    padding: 22px 26px 18px;
+    margin-bottom: 22px;
+    position: relative;
+    box-shadow: var(--shadow);
+  }
+  header.letterhead::before {
+    content: "";
+    position: absolute;
+    top: 6px; left: 6px; right: 6px; bottom: 6px;
+    border: 0.5px solid var(--rule);
+    pointer-events: none;
+  }
+  .firm-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .firm-name {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: 32px;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin: 0;
+  }
+  .firm-name em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--accent);
+  }
+  .firm-meta {
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: right;
+    line-height: 1.4;
+  }
+  .doc-title {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 0.5px solid var(--rule-soft);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .doc-title h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-style: italic;
+    font-size: 22px;
+    margin: 0;
+  }
+  .doc-title .bid-no {
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* ---------- Preset bar ---------- */
+  .preset-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+    padding: 14px;
+    border: 1.5px solid var(--rule);
+    background: var(--paper-dim);
+    box-shadow: var(--shadow);
+  }
+  .preset-bar .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    padding: 6px 10px 6px 4px;
+    align-self: center;
+  }
+  .preset-btn {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    color: var(--ink);
+    padding: 7px 12px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    text-transform: uppercase;
+  }
+  .preset-btn:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .preset-btn.active {
+    background: var(--accent);
+    color: var(--paper);
+    border-color: var(--accent);
+  }
+
+  /* ---------- Sections ---------- */
+  section.block {
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    margin-bottom: 18px;
+    box-shadow: var(--shadow);
+  }
+  section.block > .block-head {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 8px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  section.block > .block-head .acct {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--paper-dim);
+    font-weight: 400;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  section.block > .block-body {
+    padding: 16px 14px;
+  }
+
+  /* ---------- Field grids ---------- */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 18px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px 18px;
+  }
+  .grid-4 {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    gap: 12px 14px;
+  }
+  @media (max-width: 780px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .field label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+  .field input,
+  .field select,
+  .field textarea {
+    border: none;
+    border-bottom: 1px solid var(--rule);
+    background: transparent;
+    padding: 4px 2px 5px;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    outline: none;
+  }
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    border-bottom-color: var(--accent);
+    background: rgba(184, 69, 31, 0.04);
+  }
+  .field textarea {
+    resize: vertical;
+    min-height: 48px;
+    border: 1px solid var(--rule-soft);
+    padding: 6px 8px;
+  }
+
+  /* ---------- Line item tables ---------- */
+  table.lines {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  table.lines th {
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    font-weight: 500;
+    border-bottom: 1px solid var(--rule);
+    padding: 6px 8px;
+  }
+  table.lines th.num,
+  table.lines td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  table.lines td {
+    padding: 4px 8px;
+    border-bottom: 0.5px dashed var(--rule-soft);
+    vertical-align: middle;
+  }
+  table.lines tr:last-child td {
+    border-bottom: 1px solid var(--rule);
+  }
+  table.lines input[type="text"],
+  table.lines input[type="number"],
+  table.lines select {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--ink);
+    padding: 2px 0;
+    outline: none;
+  }
+  table.lines input[type="number"] {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  table.lines input:focus,
+  table.lines select:focus {
+    background: rgba(184, 69, 31, 0.05);
+  }
+  table.lines .row-total {
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .add-row {
+    margin-top: 10px;
+    padding: 6px 12px;
+    font-size: 10px;
+    background: transparent;
+    border: 1px dashed var(--rule);
+    color: var(--ink-soft);
+    cursor: pointer;
+    font-family: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .add-row:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .del {
+    background: transparent;
+    border: none;
+    color: var(--ink-soft);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 4px;
+  }
+  .del:hover { color: var(--accent); }
+
+  /* ---------- Stage time module ---------- */
+  .stage-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr 0.8fr 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--rule);
+  }
+  .stage-grid > div {
+    padding: 8px 10px;
+    border-right: 0.5px solid var(--rule-soft);
+    border-bottom: 0.5px solid var(--rule-soft);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+  }
+  .stage-grid > div:nth-child(5n) { border-right: none; }
+  .stage-grid > div.head {
+    background: var(--paper-dim);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+  .stage-grid input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--ink);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+  }
+  .stage-grid input:focus { background: rgba(184, 69, 31, 0.06); }
+  .stage-label {
+    font-weight: 500;
+  }
+  .stage-label span.who {
+    display: block;
+    font-size: 10px;
+    color: var(--ink-soft);
+    text-transform: none;
+    letter-spacing: 0;
+    margin-top: 2px;
+  }
+  @media (max-width: 780px) {
+    .stage-grid { grid-template-columns: 1fr 1fr; }
+    .stage-grid > div { border-right: none; }
+  }
+
+  /* ---------- Totals ---------- */
+  .totals {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 20px;
+    margin-top: 8px;
+  }
+  @media (max-width: 780px) {
+    .totals { grid-template-columns: 1fr; }
+  }
+  .totals .notes label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .totals .notes textarea {
+    width: 100%;
+    min-height: 100px;
+    border: 1px solid var(--rule-soft);
+    padding: 8px;
+    font-family: inherit;
+    font-size: 12px;
+    background: transparent;
+    color: var(--ink);
+    resize: vertical;
+  }
+  .totals-table {
+    border: 1.5px solid var(--rule);
+    padding: 12px 14px;
+    background: var(--paper-dim);
+  }
+  .totals-table .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .totals-table .row.divider {
+    border-top: 0.5px solid var(--rule-soft);
+    margin-top: 4px;
+    padding-top: 8px;
+  }
+  .totals-table .row.grand {
+    border-top: 1.5px solid var(--rule);
+    padding-top: 10px;
+    margin-top: 6px;
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    font-style: italic;
+  }
+  .totals-table .row .lbl {
+    color: var(--ink-soft);
+    letter-spacing: 0.04em;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  .totals-table .row.grand .lbl {
+    text-transform: none;
+    color: var(--ink);
+    font-style: italic;
+    font-size: 14px;
+  }
+  .markup-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 0.5px dashed var(--rule-soft);
+  }
+  .markup-control label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+  }
+  .markup-control input {
+    width: 50px;
+    border: 1px solid var(--rule-soft);
+    background: var(--paper);
+    padding: 2px 4px;
+    font-family: inherit;
+    font-size: 12px;
+    text-align: right;
+  }
+
+  /* ---------- Action bar ---------- */
+  .actions {
+    margin-top: 22px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .actions button {
+    padding: 9px 16px;
+    font-family: inherit;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--ink);
+    transition: all 0.12s ease;
+  }
+  .actions button:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .actions button.primary {
+    background: var(--accent);
+    color: var(--paper);
+    border-color: var(--accent);
+  }
+  .actions button.primary:hover {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+
+  /* ---------- JSON output ---------- */
+  .json-out {
+    margin-top: 18px;
+    border: 1px solid var(--rule);
+    background: var(--ink);
+    color: var(--paper);
+    padding: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 320px;
+    overflow: auto;
+    display: none;
+  }
+  .json-out.show { display: block; }
+
+  /* ---------- Risk callout ---------- */
+  .callout {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--warn);
+    background: rgba(201, 122, 31, 0.06);
+    font-size: 11px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    display: none;
+  }
+  .callout.show { display: block; }
+  .callout strong {
+    color: var(--warn);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  /* ---------- Print ---------- */
+  @media print {
+    /* white sheet, no decorative grid, preserve accent colors & shading */
+    html, body {
+      background: white;
+      background-image: none;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    /* @page owns the physical margins; drop screen padding/max-width so
+       content fills the printable width without a second inset layer */
+    .wrap { max-width: none; margin: 0; padding: 0; }
+    /* hide interactive chrome */
+    .preset-bar, .actions, .json-out, .add-row, .del { display: none !important; }
+    /* keep blocks, tables, and the totals from being sliced at a page break */
+    section.block, header.letterhead { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+    table.lines, .totals, .totals-table { break-inside: avoid; page-break-inside: avoid; }
+  }
+
+  /* small touches */
+  .crosshair {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    position: relative;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  .crosshair::before, .crosshair::after {
+    content: "";
+    position: absolute;
+    background: var(--accent);
+  }
+  .crosshair::before { left: 50%; top: 0; bottom: 0; width: 1.5px; transform: translateX(-50%); }
+  .crosshair::after { top: 50%; left: 0; right: 0; height: 1.5px; transform: translateY(-50%); }
+  .crosshair span {
+    position: absolute;
+    inset: 3px;
+    border: 1.5px solid var(--accent);
+    border-radius: 50%;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- =========== LETTERHEAD =========== -->
+  <header class="letterhead">
+    <div class="firm-row">
+      <h1 class="firm-name"><span class="crosshair"><span></span></span>Butler Surveying <em>Inc.</em></h1>
+      <div class="firm-meta">
+        P.O. Box 149 · Chehalis, WA 98532<br>
+        (360) 748-8803 · office@butlersurveying.net<br>
+        WAPLS 36792 — Christopher M. Butler, PLS
+      </div>
+    </div>
+    <div class="doc-title">
+      <h2>Proposal &amp; Fee Estimate</h2>
+      <div class="bid-no">
+        BID <input type="text" id="bidNumber" value="" placeholder="26-XXX" style="width:80px;border:none;border-bottom:1px solid var(--rule);background:transparent;font-family:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.05em;outline:none;color:var(--ink);">
+        · DATE <input type="date" id="bidDate" style="border:none;border-bottom:1px solid var(--rule);background:transparent;font-family:inherit;font-size:11px;outline:none;color:var(--ink);">
+      </div>
+    </div>
+  </header>
+
+  <!-- =========== PRESET BAR =========== -->
+  <div class="preset-bar">
+    <span class="label">Job Type Preset →</span>
+    <button class="preset-btn" data-preset="timber_boundary">Timber Boundary</button>
+    <button class="preset-btn" data-preset="lot_boundary">Lot / Residential Boundary</button>
+    <button class="preset-btn" data-preset="topo">Topographic Survey</button>
+    <button class="preset-btn" data-preset="topo_drone">Topo + Drone</button>
+    <button class="preset-btn" data-preset="alta">ALTA / Title Survey</button>
+    <button class="preset-btn" data-preset="construction">Construction Staking</button>
+    <button class="preset-btn" data-preset="ros">ROS / Retracement</button>
+    <button class="preset-btn" data-preset="bla">BLA</button>
+    <button class="preset-btn" data-preset="flood_cert">FEMA Flood / EC</button>
+    <button class="preset-btn" data-preset="blank">Blank</button>
+  </div>
+
+  <!-- =========== CLIENT + JOB =========== -->
+  <section class="block">
+    <div class="block-head"><span>§1 · Client &amp; Site</span><span class="acct">→ NocoDB: clients, jobs</span></div>
+    <div class="block-body">
+      <div class="grid-2">
+        <div class="field">
+          <label>Client Name</label>
+          <input type="text" id="clientName" placeholder="Last, First / Company">
+        </div>
+        <div class="field">
+          <label>Phone / Email</label>
+          <input type="text" id="clientContact" placeholder="(360) 555-0100 · email">
+        </div>
+        <div class="field">
+          <label>Property Address</label>
+          <input type="text" id="propAddress" placeholder="Street · City · ZIP">
+        </div>
+        <div class="field">
+          <label>Parcel(s) — TPN</label>
+          <input type="text" id="tpn" placeholder="comma separated for multi-parcel">
+        </div>
+        <div class="field">
+          <label>County</label>
+          <select id="county">
+            <option value="">—</option>
+            <option>Lewis</option>
+            <option>Thurston</option>
+            <option>Grays Harbor</option>
+            <option>Pierce</option>
+            <option>Pacific</option>
+            <option>Cowlitz</option>
+            <option>Mason</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Acreage (approx)</label>
+          <input type="number" id="acreage" step="0.01" placeholder="e.g. 42.5">
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="field" style="grid-column: span 2">
+          <label>Work Requested — Verbatim from Client</label>
+          <textarea id="workRequested" placeholder="What the client said they want, in their own words. Preserved for the file."></textarea>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========== STAGE TIME ESTIMATE =========== -->
+  <section class="block">
+    <div class="block-head"><span>§2 · Stage Time Estimate &amp; Labor Cost</span><span class="acct">→ Acct 5010 / 5020 / 5030 / 5040 / 6110</span></div>
+    <div class="block-body">
+      <div class="stage-grid" id="stageGrid">
+        <div class="head">Stage</div>
+        <div class="head" style="justify-content:flex-end">Hours</div>
+        <div class="head" style="justify-content:flex-end">Rate $/hr</div>
+        <div class="head" style="justify-content:flex-end">Crew Size</div>
+        <div class="head" style="justify-content:flex-end">Subtotal</div>
+        <!-- rows injected by JS -->
+      </div>
+      <div class="callout" id="stageNote">
+        <strong>Process Tracking</strong>
+        These stages get logged in NocoDB against the job number. The estimate here becomes the
+        baseline; actual hours get entered as the job progresses. The variance shows you which
+        stages routinely blow their estimate — that's where the holes are.
+      </div>
+    </div>
+  </section>
+
+  <!-- =========== FIELD COSTS / CONSUMABLES =========== -->
+  <section class="block">
+    <div class="block-head"><span>§3 · Field Costs &amp; Consumables</span><span class="acct">→ Acct 5210 / 5250 / 5310</span></div>
+    <div class="block-body">
+      <table class="lines" id="fieldTable">
+        <thead>
+          <tr>
+            <th style="width:42%">Description</th>
+            <th class="num" style="width:14%">Qty</th>
+            <th style="width:14%">Unit</th>
+            <th class="num" style="width:14%">Unit $</th>
+            <th class="num" style="width:12%">Total</th>
+            <th style="width:4%"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button class="add-row" data-target="fieldTable">+ Add Field Cost Line</button>
+    </div>
+  </section>
+
+  <!-- =========== EQUIPMENT WEAR =========== -->
+  <section class="block">
+    <div class="block-head"><span>§4 · Equipment Use &amp; Wear</span><span class="acct">→ Acct 5320 / 5330 / 5340</span></div>
+    <div class="block-body">
+      <table class="lines" id="equipTable">
+        <thead>
+          <tr>
+            <th style="width:42%">Equipment / Resource</th>
+            <th class="num" style="width:14%">Days/Hrs</th>
+            <th style="width:14%">Unit</th>
+            <th class="num" style="width:14%">Rate</th>
+            <th class="num" style="width:12%">Total</th>
+            <th style="width:4%"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button class="add-row" data-target="equipTable">+ Add Equipment Line</button>
+    </div>
+  </section>
+
+  <!-- =========== REIMBURSABLES =========== -->
+  <section class="block">
+    <div class="block-head"><span>§5 · Reimbursable Pass-Throughs</span><span class="acct">→ Acct 4510-4590 ↔ 5510-5590</span></div>
+    <div class="block-body">
+      <table class="lines" id="reimbTable">
+        <thead>
+          <tr>
+            <th style="width:56%">Description</th>
+            <th style="width:14%">Type</th>
+            <th class="num" style="width:14%">Est. $</th>
+            <th class="num" style="width:12%">Bill At</th>
+            <th style="width:4%"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button class="add-row" data-target="reimbTable">+ Add Reimbursable Line</button>
+      <div class="callout show" style="border-left-color: var(--accent-2); background: rgba(45,74,62,0.05);">
+        <strong style="color: var(--accent-2)">Pass-through discipline</strong>
+        These are billed at cost or with a small admin uplift. Tracked in 4500-series revenue accounts
+        offsetting 5500-series expense so true gross margin stays visible. Don't let recording fees
+        inflate your top-line revenue.
+      </div>
+    </div>
+  </section>
+
+  <!-- =========== CONTRACT TERMS / RESTAKE PROTECTION =========== -->
+  <section class="block">
+    <div class="block-head"><span>§6 · Contract Terms &amp; Restake Protection</span><span class="acct">→ Critical for construction / ALTA</span></div>
+    <div class="block-body">
+      <div class="grid-3">
+        <div class="field">
+          <label>Deposit Required</label>
+          <input type="text" id="deposit" placeholder="50% · $___ · none">
+        </div>
+        <div class="field">
+          <label>Net Terms</label>
+          <select id="netTerms">
+            <option>Net 30</option>
+            <option>Net 15</option>
+            <option>Due on completion</option>
+            <option>Progress billing</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Restake Hourly Rate</label>
+          <input type="text" id="restakeRate" placeholder="$/hr after destruction">
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="field" style="grid-column: span 2">
+          <label>Restake / Re-mobilization Clause</label>
+          <textarea id="restakeClause" rows="3"></textarea>
+        </div>
+        <div class="field" style="grid-column: span 2">
+          <label>Scope Exclusions &amp; Assumptions</label>
+          <textarea id="exclusions" rows="3" placeholder="What is NOT included. Title research limits, brush clearing by client, etc."></textarea>
+        </div>
+      </div>
+      <div class="callout" id="constructionWarning">
+        <strong>Construction Job — Restake Risk</strong>
+        Construction jobs lose money to premature staking + equipment running over offsets. The clause
+        above must be tight: client requests stakes early → client pays restake at hourly when contractors
+        destroy them. No exceptions. Document the stake date in field notes; photograph offsets after setting.
+      </div>
+    </div>
+  </section>
+
+  <!-- =========== TOTALS =========== -->
+  <section class="block">
+    <div class="block-head"><span>§7 · Totals</span><span class="acct">→ Quote to client</span></div>
+    <div class="block-body">
+      <div class="totals">
+        <div class="notes">
+          <label>Internal Notes (not on client copy)</label>
+          <textarea id="internalNotes" placeholder="Risk factors, who priced it, prior-work references from NocoDB, profit thinking..."></textarea>
+        </div>
+        <div class="totals-table">
+          <div class="row"><span class="lbl">Labor</span><span id="totLabor">$0.00</span></div>
+          <div class="row"><span class="lbl">Field Costs</span><span id="totField">$0.00</span></div>
+          <div class="row"><span class="lbl">Equipment</span><span id="totEquip">$0.00</span></div>
+          <div class="row divider"><span class="lbl">Direct Cost</span><span id="totDirect">$0.00</span></div>
+          <div class="markup-control">
+            <label>Markup %</label>
+            <input type="number" id="markup" value="35" step="1">
+            <label style="margin-left:auto">Contingency %</label>
+            <input type="number" id="contingency" value="10" step="1">
+          </div>
+          <div class="row"><span class="lbl">Markup</span><span id="totMarkup">$0.00</span></div>
+          <div class="row"><span class="lbl">Contingency</span><span id="totContingency">$0.00</span></div>
+          <div class="row"><span class="lbl">Reimbursables</span><span id="totReimb">$0.00</span></div>
+          <div class="row grand"><span class="lbl">Total Quote</span><span id="grandTotal">$0.00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========== ACTIONS =========== -->
+  <div class="actions">
+    <button onclick="window.print()">Print / PDF</button>
+    <button onclick="showJSON()">Export JSON (NocoDB)</button>
+    <button onclick="copyJSON()" class="primary">Copy JSON to Clipboard</button>
+    <button onclick="resetForm()">Reset</button>
+  </div>
+
+  <pre class="json-out" id="jsonOut"></pre>
+
+</div>
+
+<script>
+/* ============================================================
+   STAGE DEFINITIONS — your billable process
+   ============================================================ */
+const STAGES = [
+  { key: "reception",  label: "Client Intake",       who: "Receptionist — pre-job",          rate: 35,  defaultHrs: 0.5 },
+  { key: "review",     label: "Job Review & Plan",   who: "Chris or Ryan, PLS",              rate: 175, defaultHrs: 1   },
+  { key: "research",   label: "Records Research",    who: "Drafter / PLS",                   rate: 95,  defaultHrs: 2   },
+  { key: "field",      label: "Field Work",          who: "Field Crew (per person)",         rate: 110, defaultHrs: 8   },
+  { key: "drafting",   label: "Drafting / Office",   who: "Drafter",                         rate: 95,  defaultHrs: 6   },
+  { key: "final",      label: "Final Review & Seal", who: "Chris, PLS",                      rate: 175, defaultHrs: 1   },
+];
+
+/* ============================================================
+   PRESETS — keyed to job types you described
+   ============================================================ */
+const PRESETS = {
+  timber_boundary: {
+    title: "Timber Boundary",
+    stages: { reception: [0.5, 35, 1], review: [1.5, 175, 1], research: [3, 95, 1], field: [16, 110, 4], drafting: [8, 95, 1], final: [1.5, 175, 1] },
+    field: [
+      { d: "Paint — blue/orange line marking", q: 12, u: "cans", up: 8.50 },
+      { d: "Flagging tape (assorted)",          q: 6,  u: "rolls", up: 6.00 },
+      { d: "Lath / hubs / stakes",              q: 100, u: "ea", up: 1.25 },
+      { d: "Vehicle fuel — field truck",        q: 2,  u: "days", up: 85 },
+      { d: "Brush / vegetation wear factor",    q: 1,  u: "lump", up: 250 },
+      { d: "Crew per diem (rural)",             q: 8,  u: "person-days", up: 35 },
+    ],
+    equip: [
+      { d: "GNSS rover/base — Trimble R12",    q: 2, u: "days", r: 250 },
+      { d: "Total station (backup)",            q: 1, u: "days", r: 150 },
+      { d: "ATV / UTV use in timber",           q: 2, u: "days", r: 200 },
+      { d: "GNSS corrections (RTK network)",    q: 2, u: "days", r: 35 },
+    ],
+    reimb: [],
+    deposit: "33% to mobilize",
+    netTerms: "Net 30",
+    restakeRate: "",
+    restakeClause: "Found monuments and corners flagged in lath. If owner or logger removes flagging or destroys monuments before recording, re-setting is billed at hourly rate.",
+    exclusions: "Brush clearing for line-of-sight; title research beyond client-furnished deed; environmental boundaries (wetland, OHWM, stream typing).",
+    markup: 35, contingency: 12,
+    showRestakeWarn: false,
+  },
+  lot_boundary: {
+    title: "Lot / Residential Boundary",
+    stages: { reception: [0.5, 35, 1], review: [0.5, 175, 1], research: [1.5, 95, 1], field: [6, 110, 2], drafting: [4, 95, 1], final: [0.75, 175, 1] },
+    field: [
+      { d: "Lath / hubs / stakes",            q: 30, u: "ea", up: 1.25 },
+      { d: "Flagging tape",                    q: 2,  u: "rolls", up: 6.00 },
+      { d: "Vehicle fuel",                     q: 1,  u: "days", up: 60 },
+      { d: "Paint — pin flags / corner mark", q: 2,  u: "cans", up: 8.50 },
+    ],
+    equip: [
+      { d: "Total station + data collector",   q: 1, u: "days", r: 150 },
+      { d: "GNSS rover (control / tie)",       q: 1, u: "days", r: 250 },
+      { d: "GNSS corrections (RTK network)",   q: 1, u: "days", r: 35 },
+    ],
+    reimb: [],
+    deposit: "50% to start",
+    netTerms: "Net 30",
+    restakeRate: "$135/hr 2-man field rate",
+    restakeClause: "Property corners set & flagged. Owner is responsible for preservation; re-staking after construction or landscaping is billed at field hourly rate.",
+    exclusions: "Title research beyond county records; encroachment resolution; legal opinion.",
+    markup: 35, contingency: 8,
+    showRestakeWarn: false,
+  },
+  topo: {
+    title: "Topographic Survey",
+    stages: { reception: [0.5, 35, 1], review: [1, 175, 1], research: [1.5, 95, 1], field: [8, 110, 2], drafting: [12, 95, 1], final: [1, 175, 1] },
+    field: [
+      { d: "Flagging tape",                  q: 2,  u: "rolls", up: 6.00 },
+      { d: "Pin flags (color-coded)",        q: 100, u: "ea", up: 0.45 },
+      { d: "Paint — utility mark-out colors", q: 4, u: "cans", up: 8.50 },
+      { d: "Vehicle fuel",                    q: 1,  u: "days", up: 75 },
+    ],
+    equip: [
+      { d: "Total station + data collector",  q: 1, u: "days", r: 150 },
+      { d: "GNSS rover",                      q: 1, u: "days", r: 250 },
+      { d: "GNSS corrections (RTK network)",  q: 1, u: "days", r: 35 },
+      { d: "Drafting software allocation",    q: 1, u: "job",  r: 25 },
+    ],
+    reimb: [],
+    deposit: "50% to start",
+    netTerms: "Net 30",
+    restakeRate: "$135/hr",
+    restakeClause: "Topo deliverable is a drawing, not staked points. Field locations of utilities reflect surface evidence only; subsurface USIC ticket is client's responsibility.",
+    exclusions: "Subsurface utility locating (call 811 — client); design services; environmental delineation.",
+    markup: 40, contingency: 10,
+    showRestakeWarn: false,
+  },
+  topo_drone: {
+    title: "Topo + Drone (Aerial)",
+    stages: { reception: [0.5, 35, 1], review: [1.5, 175, 1], research: [1.5, 95, 1], field: [6, 110, 2], drafting: [14, 95, 1], final: [1.5, 175, 1] },
+    field: [
+      { d: "Ground control panels / paint",   q: 12, u: "ea", up: 12 },
+      { d: "Flagging tape",                    q: 2,  u: "rolls", up: 6.00 },
+      { d: "Drone batteries (rotation)",       q: 4,  u: "cycles", up: 0 },
+      { d: "Vehicle fuel",                     q: 1,  u: "days", up: 75 },
+    ],
+    equip: [
+      { d: "Drone (DJI Phantom / Matrice)",    q: 1, u: "days", r: 350 },
+      { d: "GNSS rover (ground control)",      q: 1, u: "days", r: 250 },
+      { d: "Total station",                    q: 0.5, u: "days", r: 150 },
+      { d: "Photogrammetry software (Pix4D / Metashape)", q: 1, u: "job", r: 125 },
+      { d: "Compute time — point cloud processing",       q: 1, u: "job", r: 60 },
+    ],
+    reimb: [
+      { d: "FAA airspace authorization (if Class B/C/D)", t: "Agency", c: 0, b: 0 },
+    ],
+    deposit: "50% to start",
+    netTerms: "Net 30",
+    restakeRate: "n/a — drone deliverable",
+    restakeClause: "Aerial deliverable. Weather may delay flight; client notified at least 24 hours prior to remobilization. No restaking applies.",
+    exclusions: "FAA Part 107 waiver costs if Class B/C/D airspace; cloud-cover delays; tree-canopy bare-earth (provided as best-available).",
+    markup: 45, contingency: 12,
+    showRestakeWarn: false,
+  },
+  alta: {
+    title: "ALTA / NSPS Land Title Survey",
+    stages: { reception: [1, 35, 1], review: [2, 175, 1], research: [6, 95, 1], field: [10, 110, 2], drafting: [16, 95, 1], final: [2, 175, 1] },
+    field: [
+      { d: "Lath / hubs / stakes",            q: 40, u: "ea", up: 1.25 },
+      { d: "Flagging tape",                    q: 4, u: "rolls", up: 6.00 },
+      { d: "Paint — corner marking",           q: 3, u: "cans", up: 8.50 },
+      { d: "Vehicle fuel",                     q: 2, u: "days", up: 75 },
+    ],
+    equip: [
+      { d: "Total station + data collector",   q: 2, u: "days", r: 150 },
+      { d: "GNSS rover/base",                  q: 2, u: "days", r: 250 },
+      { d: "GNSS corrections (RTK network)",   q: 2, u: "days", r: 35 },
+      { d: "Drafting software allocation",     q: 1, u: "job", r: 40 },
+    ],
+    reimb: [
+      { d: "Title commitment (client to supply, or we order)", t: "Title",  c: 450, b: 450 },
+      { d: "Recording fees",                                    t: "Agency", c: 200, b: 200 },
+    ],
+    deposit: "50% — written contract required",
+    netTerms: "Progress billing",
+    restakeRate: "$145/hr 2-man",
+    restakeClause: "ALTA scope is defined by Table A items selected and the title commitment furnished. Re-survey or re-mobilization for amended title commitments billed at hourly rate. Boundary monuments protected by client.",
+    exclusions: "Table A items not explicitly checked; title curative work; environmental Phase I; legal advice on encroachments.",
+    markup: 40, contingency: 15,
+    showRestakeWarn: false,
+  },
+  construction: {
+    title: "Construction Staking",
+    stages: { reception: [0.5, 35, 1], review: [2, 175, 1], research: [2, 95, 1], field: [12, 110, 2], drafting: [4, 95, 1], final: [1, 175, 1] },
+    field: [
+      { d: "Lath / hubs / stakes",            q: 200, u: "ea", up: 1.25 },
+      { d: "Flagging tape — assorted colors", q: 8,   u: "rolls", up: 6.00 },
+      { d: "Paint — line / offset marking",   q: 8,   u: "cans", up: 8.50 },
+      { d: "Pin flags",                        q: 200, u: "ea", up: 0.45 },
+      { d: "Vehicle fuel",                     q: 3,   u: "days", up: 75 },
+      { d: "Crew wear/tear contingency",       q: 1,   u: "lump", up: 200 },
+    ],
+    equip: [
+      { d: "Total station + data collector",   q: 3, u: "days", r: 150 },
+      { d: "GNSS rover/base",                  q: 3, u: "days", r: 250 },
+      { d: "GNSS corrections (RTK network)",   q: 3, u: "days", r: 35 },
+    ],
+    reimb: [],
+    deposit: "50% to start — WRITTEN CONTRACT REQUIRED",
+    netTerms: "Progress billing every 2 weeks",
+    restakeRate: "$145/hr 2-man + $50 mobilization",
+    restakeClause: "STAKES ARE THE CONTRACTOR'S RESPONSIBILITY ONCE SET. If grading, excavation, or any construction activity destroys stakes/offsets before final structure verification, restaking is billed at the rate above PER MOBILIZATION. Photos taken at time of staking establish the as-set condition. Premature staking at client/GC request — same terms; no free restakes regardless of who ordered timing.",
+    exclusions: "Restaking after construction activity (billed hourly); as-built surveys (separate scope); design changes mid-project (new scope, new fee).",
+    markup: 40, contingency: 18,
+    showRestakeWarn: true,
+  },
+  ros: {
+    title: "ROS / Retracement",
+    stages: { reception: [0.5, 35, 1], review: [1.5, 175, 1], research: [3, 95, 1], field: [10, 110, 2], drafting: [10, 95, 1], final: [1.5, 175, 1] },
+    field: [
+      { d: "Lath / hubs / stakes",           q: 40, u: "ea", up: 1.25 },
+      { d: "Rebar + caps for set monuments", q: 8,  u: "ea", up: 12 },
+      { d: "Flagging tape",                   q: 3,  u: "rolls", up: 6.00 },
+      { d: "Paint — corner marking",          q: 2,  u: "cans", up: 8.50 },
+      { d: "Vehicle fuel",                    q: 2,  u: "days", up: 75 },
+    ],
+    equip: [
+      { d: "Total station + data collector",  q: 2, u: "days", r: 150 },
+      { d: "GNSS rover/base",                 q: 2, u: "days", r: 250 },
+      { d: "GNSS corrections (RTK network)",  q: 2, u: "days", r: 35 },
+    ],
+    reimb: [
+      { d: "Recording fee — county auditor",  t: "Agency", c: 144, b: 144 },
+    ],
+    deposit: "50% to start",
+    netTerms: "Net 30 from recording",
+    restakeRate: "$135/hr",
+    restakeClause: "Set monuments recorded per WAC and signed by PLS. Replacement of removed/destroyed set monuments by others billed at field hourly + monument cost.",
+    exclusions: "Title research beyond standard county records; legal action; resolution of unwritten title issues.",
+    markup: 38, contingency: 10,
+    showRestakeWarn: false,
+  },
+  bla: {
+    title: "Boundary Line Adjustment",
+    stages: { reception: [0.75, 35, 1], review: [1.5, 175, 1], research: [2, 95, 1], field: [6, 110, 2], drafting: [8, 95, 1], final: [1.5, 175, 1] },
+    field: [
+      { d: "Lath / hubs / stakes",           q: 25, u: "ea", up: 1.25 },
+      { d: "Rebar + caps for set monuments", q: 6,  u: "ea", up: 12 },
+      { d: "Flagging tape",                   q: 2,  u: "rolls", up: 6.00 },
+      { d: "Vehicle fuel",                    q: 1,  u: "days", up: 70 },
+    ],
+    equip: [
+      { d: "Total station + data collector",  q: 1, u: "days", r: 150 },
+      { d: "GNSS rover",                      q: 1, u: "days", r: 250 },
+      { d: "GNSS corrections",                q: 1, u: "days", r: 35 },
+    ],
+    reimb: [
+      { d: "Recording fee — county auditor",  t: "Agency", c: 144, b: 144 },
+      { d: "County BLA review fee",           t: "Agency", c: 250, b: 250 },
+    ],
+    deposit: "50% to start",
+    netTerms: "Net 30 from recording",
+    restakeRate: "$135/hr",
+    restakeClause: "Set monuments recorded. Replacement of monuments destroyed by others billed at field hourly.",
+    exclusions: "Legal description revisions outside agreed scope; title curative; deed preparation (client's attorney).",
+    markup: 35, contingency: 10,
+    showRestakeWarn: false,
+  },
+  flood_cert: {
+    title: "FEMA Elevation Certificate",
+    stages: { reception: [0.25, 35, 1], review: [0.25, 175, 1], research: [0.5, 95, 1], field: [1.5, 110, 1], drafting: [1.5, 95, 1], final: [0.5, 175, 1] },
+    field: [
+      { d: "Vehicle fuel",                    q: 0.5, u: "days", up: 60 },
+    ],
+    equip: [
+      { d: "GNSS rover (NAVD88 elevation)",   q: 0.5, u: "days", r: 250 },
+      { d: "GNSS corrections",                q: 0.5, u: "days", r: 35 },
+    ],
+    reimb: [],
+    deposit: "Due on completion",
+    netTerms: "Due on delivery",
+    restakeRate: "n/a",
+    restakeClause: "Elevation certificate is a recorded measurement at point in time. Lender or insurer requested revisions billed at hourly if outside scope of original cert.",
+    exclusions: "LOMA / LOMR petition (separate scope); structure modifications; insurance advice.",
+    markup: 50, contingency: 5,
+    showRestakeWarn: false,
+  },
+  blank: { title: "Blank", stages: {}, field: [], equip: [], reimb: [], deposit:"", netTerms:"Net 30", restakeRate:"", restakeClause:"", exclusions:"", markup: 35, contingency: 10, showRestakeWarn: false }
+};
+
+/* ============================================================
+   BUILD UI
+   ============================================================ */
+function buildStageGrid() {
+  const grid = document.getElementById('stageGrid');
+  // remove all but the 5 header divs
+  while (grid.children.length > 5) grid.removeChild(grid.lastChild);
+
+  STAGES.forEach(s => {
+    const lbl = document.createElement('div');
+    lbl.className = 'stage-label';
+    lbl.innerHTML = `${s.label}<span class="who">${s.who}</span>`;
+    grid.appendChild(lbl);
+
+    const hrs = document.createElement('div');
+    hrs.innerHTML = `<input type="number" step="0.25" data-stage="${s.key}" data-f="hrs" value="0">`;
+    grid.appendChild(hrs);
+
+    const rate = document.createElement('div');
+    rate.innerHTML = `<input type="number" step="1" data-stage="${s.key}" data-f="rate" value="${s.rate}">`;
+    grid.appendChild(rate);
+
+    const crew = document.createElement('div');
+    crew.innerHTML = `<input type="number" step="1" data-stage="${s.key}" data-f="crew" value="1" min="1">`;
+    grid.appendChild(crew);
+
+    const sub = document.createElement('div');
+    sub.style.justifyContent = 'flex-end';
+    sub.innerHTML = `<span class="row-total" data-stage="${s.key}" data-f="sub">$0.00</span>`;
+    grid.appendChild(sub);
+  });
+}
+
+function addLineRow(tableId, data = {}) {
+  const tbody = document.querySelector(`#${tableId} tbody`);
+  const tr = document.createElement('tr');
+  if (tableId === 'reimbTable') {
+    tr.innerHTML = `
+      <td><input type="text" data-f="d" value="${data.d||''}"></td>
+      <td><input type="text" data-f="t" value="${data.t||'Agency'}"></td>
+      <td class="num"><input type="number" step="0.01" data-f="c" value="${data.c||0}"></td>
+      <td class="num"><input type="number" step="0.01" data-f="b" value="${data.b||0}"></td>
+      <td><button class="del" title="Delete row">×</button></td>
+    `;
+  } else {
+    const fieldQty = (tableId === 'fieldTable') ? 'q' : 'q';
+    const fieldUp  = (tableId === 'fieldTable') ? 'up' : 'r';
+    tr.innerHTML = `
+      <td><input type="text" data-f="d" value="${data.d||''}"></td>
+      <td class="num"><input type="number" step="0.01" data-f="${fieldQty}" value="${data[fieldQty]||0}"></td>
+      <td><input type="text" data-f="u" value="${data.u||''}"></td>
+      <td class="num"><input type="number" step="0.01" data-f="${fieldUp}" value="${data[fieldUp]||0}"></td>
+      <td class="num row-total" data-f="total">$0.00</td>
+      <td><button class="del" title="Delete row">×</button></td>
+    `;
+  }
+  tbody.appendChild(tr);
+  tr.querySelector('.del').addEventListener('click', () => { tr.remove(); recalc(); });
+  tr.querySelectorAll('input').forEach(i => i.addEventListener('input', recalc));
+}
+
+/* ============================================================
+   CALCULATION
+   ============================================================ */
+function $(s, ctx=document) { return ctx.querySelector(s); }
+function $$(s, ctx=document) { return Array.from(ctx.querySelectorAll(s)); }
+function money(n) { return '$' + (Number(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+function recalc() {
+  // labor
+  let labor = 0;
+  STAGES.forEach(s => {
+    const hrs  = parseFloat($(`[data-stage="${s.key}"][data-f="hrs"]`).value) || 0;
+    const rate = parseFloat($(`[data-stage="${s.key}"][data-f="rate"]`).value) || 0;
+    const crew = parseFloat($(`[data-stage="${s.key}"][data-f="crew"]`).value) || 1;
+    const sub  = hrs * rate * crew;
+    $(`[data-stage="${s.key}"][data-f="sub"]`).textContent = money(sub);
+    labor += sub;
+  });
+
+  // field costs
+  let field = 0;
+  $$('#fieldTable tbody tr').forEach(tr => {
+    const q  = parseFloat(tr.querySelector('[data-f="q"]').value) || 0;
+    const up = parseFloat(tr.querySelector('[data-f="up"]').value) || 0;
+    const t  = q * up;
+    tr.querySelector('[data-f="total"]').textContent = money(t);
+    field += t;
+  });
+
+  // equipment
+  let equip = 0;
+  $$('#equipTable tbody tr').forEach(tr => {
+    const q = parseFloat(tr.querySelector('[data-f="q"]').value) || 0;
+    const r = parseFloat(tr.querySelector('[data-f="r"]').value) || 0;
+    const t = q * r;
+    tr.querySelector('[data-f="total"]').textContent = money(t);
+    equip += t;
+  });
+
+  // reimb (bill side counts toward total)
+  let reimb = 0;
+  $$('#reimbTable tbody tr').forEach(tr => {
+    const b = parseFloat(tr.querySelector('[data-f="b"]').value) || 0;
+    reimb += b;
+  });
+
+  const direct = labor + field + equip;
+  const markupPct = parseFloat($('#markup').value) || 0;
+  const contingencyPct = parseFloat($('#contingency').value) || 0;
+  const markup = direct * (markupPct/100);
+  const contingency = (direct + markup) * (contingencyPct/100);
+  const grand = direct + markup + contingency + reimb;
+
+  $('#totLabor').textContent = money(labor);
+  $('#totField').textContent = money(field);
+  $('#totEquip').textContent = money(equip);
+  $('#totDirect').textContent = money(direct);
+  $('#totMarkup').textContent = money(markup);
+  $('#totContingency').textContent = money(contingency);
+  $('#totReimb').textContent = money(reimb);
+  $('#grandTotal').textContent = money(grand);
+}
+
+/* ============================================================
+   PRESETS
+   ============================================================ */
+function applyPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+
+  // mark active
+  $$('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
+
+  // stages
+  STAGES.forEach(s => {
+    const v = p.stages[s.key];
+    const hrs  = $(`[data-stage="${s.key}"][data-f="hrs"]`);
+    const rate = $(`[data-stage="${s.key}"][data-f="rate"]`);
+    const crew = $(`[data-stage="${s.key}"][data-f="crew"]`);
+    if (v) {
+      hrs.value = v[0];
+      rate.value = v[1];
+      crew.value = v[2];
+    } else {
+      hrs.value = 0;
+      rate.value = s.rate;
+      crew.value = 1;
+    }
+  });
+
+  // clear and refill line tables
+  ['fieldTable','equipTable','reimbTable'].forEach(t => {
+    document.querySelector(`#${t} tbody`).innerHTML = '';
+  });
+  (p.field || []).forEach(r => addLineRow('fieldTable', r));
+  (p.equip || []).forEach(r => addLineRow('equipTable', r));
+  (p.reimb || []).forEach(r => addLineRow('reimbTable', r));
+
+  // contract fields
+  $('#deposit').value = p.deposit || '';
+  $('#netTerms').value = p.netTerms || 'Net 30';
+  $('#restakeRate').value = p.restakeRate || '';
+  $('#restakeClause').value = p.restakeClause || '';
+  $('#exclusions').value = p.exclusions || '';
+  $('#markup').value = p.markup;
+  $('#contingency').value = p.contingency;
+
+  // warning
+  $('#constructionWarning').classList.toggle('show', p.showRestakeWarn);
+  $('#stageNote').classList.add('show');
+
+  recalc();
+}
+
+/* ============================================================
+   EXPORT — NocoDB-ready JSON
+   ============================================================ */
+function buildJSON() {
+  const stages = {};
+  STAGES.forEach(s => {
+    stages[s.key] = {
+      label: s.label,
+      who: s.who,
+      hours_est: parseFloat($(`[data-stage="${s.key}"][data-f="hrs"]`).value) || 0,
+      rate: parseFloat($(`[data-stage="${s.key}"][data-f="rate"]`).value) || 0,
+      crew: parseFloat($(`[data-stage="${s.key}"][data-f="crew"]`).value) || 1,
+      subtotal: (parseFloat($(`[data-stage="${s.key}"][data-f="hrs"]`).value) || 0) *
+                (parseFloat($(`[data-stage="${s.key}"][data-f="rate"]`).value) || 0) *
+                (parseFloat($(`[data-stage="${s.key}"][data-f="crew"]`).value) || 1),
+      hours_actual: null,    // filled in as job progresses
+      variance: null
+    };
+  });
+
+  const tableToArr = (id, fields) =>
+    $$(`#${id} tbody tr`).map(tr => {
+      const o = {};
+      fields.forEach(f => {
+        const el = tr.querySelector(`[data-f="${f}"]`);
+        if (el) o[f] = el.tagName === 'INPUT' && el.type === 'number' ?
+          (parseFloat(el.value) || 0) : el.value || el.textContent;
+      });
+      return o;
+    });
+
+  return {
+    bid_number: $('#bidNumber').value,
+    bid_date: $('#bidDate').value,
+    job_status: "quoted",  // NocoDB status field — initial state
+    client: {
+      name: $('#clientName').value,
+      contact: $('#clientContact').value,
+    },
+    site: {
+      address: $('#propAddress').value,
+      tpn: $('#tpn').value,
+      county: $('#county').value,
+      acreage: parseFloat($('#acreage').value) || null,
+    },
+    work_requested_verbatim: $('#workRequested').value,
+    job_type_preset: $$('.preset-btn').find(b => b.classList.contains('active'))?.dataset.preset || null,
+    stages: stages,
+    field_costs: tableToArr('fieldTable', ['d','q','u','up']),
+    equipment: tableToArr('equipTable', ['d','q','u','r']),
+    reimbursables: tableToArr('reimbTable', ['d','t','c','b']),
+    terms: {
+      deposit: $('#deposit').value,
+      net_terms: $('#netTerms').value,
+      restake_rate: $('#restakeRate').value,
+      restake_clause: $('#restakeClause').value,
+      exclusions: $('#exclusions').value,
+    },
+    totals: {
+      labor: parseFloat($('#totLabor').textContent.replace(/[^0-9.-]/g,'')),
+      field_costs: parseFloat($('#totField').textContent.replace(/[^0-9.-]/g,'')),
+      equipment: parseFloat($('#totEquip').textContent.replace(/[^0-9.-]/g,'')),
+      direct_cost: parseFloat($('#totDirect').textContent.replace(/[^0-9.-]/g,'')),
+      markup_pct: parseFloat($('#markup').value),
+      contingency_pct: parseFloat($('#contingency').value),
+      markup: parseFloat($('#totMarkup').textContent.replace(/[^0-9.-]/g,'')),
+      contingency: parseFloat($('#totContingency').textContent.replace(/[^0-9.-]/g,'')),
+      reimbursables: parseFloat($('#totReimb').textContent.replace(/[^0-9.-]/g,'')),
+      grand_total: parseFloat($('#grandTotal').textContent.replace(/[^0-9.-]/g,'')),
+    },
+    internal_notes: $('#internalNotes').value,
+  };
+}
+
+function showJSON() {
+  const out = document.getElementById('jsonOut');
+  out.textContent = JSON.stringify(buildJSON(), null, 2);
+  out.classList.add('show');
+  out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function copyJSON() {
+  const txt = JSON.stringify(buildJSON(), null, 2);
+  navigator.clipboard.writeText(txt).then(() => {
+    const out = document.getElementById('jsonOut');
+    out.textContent = "// Copied to clipboard\n\n" + txt;
+    out.classList.add('show');
+  });
+}
+
+function resetForm() {
+  if (!confirm("Reset all fields?")) return;
+  document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
+    if (el.id === 'markup') el.value = 35;
+    else if (el.id === 'contingency') el.value = 10;
+    else el.value = '';
+  });
+  document.getElementById('county').value = '';
+  document.getElementById('netTerms').value = 'Net 30';
+  ['fieldTable','equipTable','reimbTable'].forEach(t => {
+    document.querySelector(`#${t} tbody`).innerHTML = '';
+  });
+  STAGES.forEach(s => {
+    $(`[data-stage="${s.key}"][data-f="hrs"]`).value = 0;
+    $(`[data-stage="${s.key}"][data-f="rate"]`).value = s.rate;
+    $(`[data-stage="${s.key}"][data-f="crew"]`).value = 1;
+  });
+  $$('.preset-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('constructionWarning').classList.remove('show');
+  document.getElementById('jsonOut').classList.remove('show');
+  recalc();
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  // date default
+  document.getElementById('bidDate').valueAsDate = new Date();
+  // stage grid
+  buildStageGrid();
+  // wire stage inputs
+  $$('[data-stage]').forEach(i => i.addEventListener('input', recalc));
+  // wire markup / contingency
+  $('#markup').addEventListener('input', recalc);
+  $('#contingency').addEventListener('input', recalc);
+  // wire preset buttons
+  $$('.preset-btn').forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+  // wire add-row buttons
+  $$('.add-row').forEach(b => b.addEventListener('click', () => addLineRow(b.dataset.target)));
+
+  recalc();
+});
+</script>
+</body>
+</html>

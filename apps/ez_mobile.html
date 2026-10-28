@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0e17">
+<title>EZ Mobile</title>
+<style>
+/* ============================================================
+   DESIGN TOKENS — match EZ PZ palette exactly
+   ============================================================ */
+:root {
+  --bg:          #0a0e17;
+  --panel:       #141922;
+  --panel-2:     #1d2436;
+  --border:      #263047;
+  --border-hot:  #364060;
+  --teal:        #00e5d1;
+  --teal-dim:    rgba(0,229,209,0.10);
+  --good:        #4ade80;
+  --good-soft:   rgba(74,222,128,0.08);
+  --danger:      #ff5a4d;
+  --danger-soft: rgba(255,90,77,0.08);
+  --amber:       #ffb547;
+  --fg:          #dce8f8;
+  --fg-dim:      #8fa3c0;
+  --fg-mute:     #4d637f;
+  --font-mono:   'Menlo','SF Mono','Consolas',monospace;
+  --font-ui:     -apple-system,'SF Pro Display','SF Pro Text',system-ui,sans-serif;
+  /* safe areas for Dynamic Island + home bar */
+  --st: env(safe-area-inset-top,    0px);
+  --sb: env(safe-area-inset-bottom, 0px);
+  --sl: env(safe-area-inset-left,   0px);
+  --sr: env(safe-area-inset-right,  0px);
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  background: var(--bg);
+  /* subtle dot-grid backdrop, same as EZ PZ */
+  background-image:
+    radial-gradient(circle, #1e2940 1px, transparent 1px),
+    radial-gradient(circle, #1e2940 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--fg);
+  height: 100dvh;
+  overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding-top: var(--st);
+  padding-bottom: var(--sb);
+  padding-left: var(--sl);
+  padding-right: var(--sr);
+}
+
+/* ============================================================
+   TOPBAR
+   ============================================================ */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+.topbar-wordmark {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--teal);
+}
+
+.topbar-wordmark span {
+  color: var(--fg-dim);
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: 0;
+  margin-left: 2px;
+}
+
+.topbar-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--teal);
+  background: var(--teal-dim);
+  border: 1px solid rgba(0,229,209,0.25);
+  border-radius: 4px;
+  padding: 2px 5px;
+  letter-spacing: 0.08em;
+}
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--fg-dim);
+  font-size: 14px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color .15s, border-color .15s;
+}
+.icon-btn:active { color: var(--teal); border-color: var(--teal); }
+
+/* ============================================================
+   CLOSURE HERO — sticky, always visible
+   ============================================================ */
+.closure-hero {
+  margin: 10px 14px 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  flex-shrink: 0;
+  transition: border-color .2s, background .2s;
+}
+
+.closure-hero.ok {
+  border-color: var(--good);
+  background: var(--good-soft);
+}
+
+.closure-hero.bad {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.hero-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.hero-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-mute);
+  flex-shrink: 0;
+  transition: background .2s;
+}
+.closure-hero.ok  .hero-dot { background: var(--good); }
+.closure-hero.bad .hero-dot { background: var(--danger); }
+
+.hero-status {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--fg-mute);
+  transition: color .2s;
+}
+.closure-hero.ok  .hero-status { color: var(--good); }
+.closure-hero.bad .hero-status { color: var(--danger); }
+
+/* Big precision number */
+.hero-prec-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.hero-prec-label {
+  font-size: 11px;
+  color: var(--fg-mute);
+  letter-spacing: 0.04em;
+}
+
+.hero-prec-value {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--fg-dim);
+  letter-spacing: -0.03em;
+  transition: color .2s;
+}
+.closure-hero.ok  .hero-prec-value { color: var(--good); }
+.closure-hero.bad .hero-prec-value { color: var(--danger); }
+
+/* 3-column stat row */
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.hero-stat {
+  padding: 7px 8px;
+  border-right: 1px solid var(--border);
+}
+.hero-stat:last-child { border-right: none; }
+
+.hero-stat-label {
+  font-size: 9px;
+  color: var(--fg-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+
+.hero-stat-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hero-stat-value.area {
+  color: var(--teal);
+  font-size: 11px;
+}
+
+/* ============================================================
+   SCROLLABLE ROWS
+   ============================================================ */
+.rows-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 10px 14px 6px;
+}
+
+/* POB card */
+.pob-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin-bottom: 9px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pob-pill {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--amber);
+  background: rgba(255,181,71,0.10);
+  border: 1px solid rgba(255,181,71,0.25);
+  border-radius: 5px;
+  padding: 3px 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pob-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  flex: 1;
+}
+
+.pob-field label {
+  display: block;
+  font-size: 9px;
+  color: var(--fg-mute);
+  margin-bottom: 2px;
+  letter-spacing: 0.04em;
+}
+
+/* Call row */
+.call-row {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  margin-bottom: 8px;
+  transition: border-color .15s;
+}
+
+.call-row.valid-row { border-color: rgba(74,222,128,0.20); }
+
+.call-row-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.row-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fg-mute);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  min-width: 26px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.row-pt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--teal);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-del {
+  background: none;
+  border: none;
+  color: var(--fg-mute);
+  font-size: 22px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+.row-del:active { color: var(--danger); }
+
+.call-row-fields {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 7px;
+}
+
+.call-field label {
+  display: block;
+  font-size: 9px;
+  color: var(--fg-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+
+.bearing-disp {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--teal);
+  margin-top: 3px;
+  min-height: 13px;
+  white-space: nowrap;
+}
+.bearing-disp.err { color: var(--danger); }
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 28px 0 12px;
+  color: var(--fg-mute);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.empty-format {
+  display: inline-block;
+  margin-top: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  text-align: left;
+  line-height: 1.8;
+}
+
+.fmt-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.fmt-code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--fg);
+  font-weight: 600;
+  min-width: 80px;
+}
+.fmt-label {
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+
+/* ============================================================
+   INPUTS — 16px+ to prevent iOS auto-zoom
+   ============================================================ */
+input[type="text"],
+input[type="number"] {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--border-hot);
+  border-radius: 7px;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 9px 10px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  caret-color: var(--teal);
+  transition: border-color .15s;
+}
+
+input:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(0,229,209,0.10);
+}
+
+input.inp-err {
+  border-color: var(--danger);
+}
+
+/* hide number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+/* ============================================================
+   BOTTOM ACTION BAR
+   ============================================================ */
+.action-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+.act-btn {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg-dim);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 13px 10px;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.act-btn:active { opacity: 0.65; }
+
+.act-btn.add {
+  flex: 2;
+  font-size: 26px;
+  font-weight: 300;
+  background: var(--teal);
+  color: #0a0e17;
+  border-color: var(--teal);
+  font-weight: 700;
+}
+
+.act-btn.side { flex: 1; }
+.act-btn.danger-btn { color: var(--danger); }
+.act-btn.danger-btn:active { border-color: var(--danger); background: var(--danger-soft); }
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+.toast {
+  position: fixed;
+  inset: auto auto calc(76px + var(--sb)) 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--panel);
+  border: 1px solid var(--teal);
+  color: var(--teal);
+  border-radius: 20px;
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s, transform 0.18s;
+  white-space: nowrap;
+  z-index: 9999;
+  font-family: var(--font-ui);
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ============================================================
+   MISCLOSE DETAIL (shown when not closed)
+   ============================================================ */
+.misclose-detail {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-mute);
+  margin-top: 2px;
+  letter-spacing: 0.02em;
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ─── TOPBAR ─────────────────────────────────────── -->
+  <div class="topbar">
+    <div class="topbar-wordmark">EZ Mobile<span>· Piezo Labs</span></div>
+    <div class="topbar-badge">v1.0</div>
+    <div class="topbar-right">
+      <button class="icon-btn" onclick="copyTSV()" title="Copy as tab-separated table">⬆</button>
+    </div>
+  </div>
+
+  <!-- ─── CLOSURE HERO ──────────────────────────────── -->
+  <div class="closure-hero" id="hero">
+    <div class="hero-top">
+      <div class="hero-dot" id="heroDot"></div>
+      <div class="hero-status" id="heroStatus">No calls entered</div>
+    </div>
+    <div class="hero-prec-wrap">
+      <div class="hero-prec-label">Precision</div>
+      <div class="hero-prec-value" id="heroPrec">—</div>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-label">Perimeter</div>
+        <div class="hero-stat-value" id="statTotal">—</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-label">Linear err</div>
+        <div class="hero-stat-value" id="statLerr">—</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-label">Area / ΔN·ΔE</div>
+        <div class="hero-stat-value area" id="statArea">—</div>
+      </div>
+    </div>
+    <div class="misclose-detail" id="heroDetail"></div>
+  </div>
+
+  <!-- ─── SCROLLABLE ROW LIST ───────────────────────── -->
+  <div class="rows-scroll" id="rowsScroll">
+
+    <!-- POB -->
+    <div class="pob-card">
+      <div class="pob-pill">POB</div>
+      <div class="pob-fields">
+        <div class="pob-field">
+          <label>Northing</label>
+          <input type="number" id="pobN" value="5000" inputmode="decimal"
+            placeholder="5000.00" autocomplete="off" oninput="recalc()">
+        </div>
+        <div class="pob-field">
+          <label>Easting</label>
+          <input type="number" id="pobE" value="5000" inputmode="decimal"
+            placeholder="5000.00" autocomplete="off" oninput="recalc()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Call rows injected here -->
+    <div id="callList"></div>
+
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState">
+      <div>Tap <b>+</b> to enter a bearing call.</div>
+      <div class="empty-format">
+        <div class="fmt-row"><span class="fmt-code">145.3020</span><span class="fmt-label">= N 45°30'20" E</span></div>
+        <div class="fmt-row"><span class="fmt-code">245.3020</span><span class="fmt-label">= S 45°30'20" E</span></div>
+        <div class="fmt-row"><span class="fmt-code">389</span><span class="fmt-label">= S 89°00'00" W</span></div>
+        <div class="fmt-row"><span class="fmt-code">410.0000</span><span class="fmt-label">= N 10°00'00" W</span></div>
+        <div style="margin-top:6px;font-size:10px;color:var(--fg-mute);">
+          Quadrant 1=NE · 2=SE · 3=SW · 4=NW<br>
+          Then degrees · .MMSS optional<br>
+          <span style="color:var(--amber)">For curves: use chord bearing + chord distance.</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ─── ACTION BAR ────────────────────────────────── -->
+  <div class="action-bar">
+    <button class="act-btn side danger-btn" onclick="confirmClear()">Clear</button>
+    <button class="act-btn add"             onclick="addRow()">+</button>
+    <button class="act-btn side"            onclick="copyTSV()">Copy</button>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// BEARING MATH — direct port from EZ PZ v14
+// ============================================================
+
+function parseBearingParts(val) {
+  const s = (val == null ? '' : val.toString()).trim();
+  if (!s) return null;
+  const m = s.match(/^([1-4])(\d{1,2})(?:\.(\d{2})(\d{2}(?:\d+)?)?)?$/);
+  if (!m) return null;
+  const q   = parseInt(m[1]);
+  const deg = parseInt(m[2]);
+  const min = m[3] != null ? parseInt(m[3]) : 0;
+  const secStr = m[4] || '';
+  let sec = 0;
+  if (secStr.length >= 2) {
+    const secWhole = parseInt(secStr.slice(0, 2));
+    const secFrac  = secStr.length > 2 ? parseFloat('0.' + secStr.slice(2)) : 0;
+    sec = secWhole + secFrac;
+  }
+  if (deg >= 90 || min >= 60 || sec >= 60) return null;
+  return { q, deg, min, sec };
+}
+
+function parseBearing(val) {
+  const p = parseBearingParts(val);
+  if (!p) return null;
+  const dd = p.deg + p.min / 60 + p.sec / 3600;
+  return { 1: dd, 2: 180 - dd, 3: 180 + dd, 4: 360 - dd }[p.q];
+}
+
+function bearDisp(val) {
+  const p = parseBearingParts(val);
+  if (!p) return '';
+  const dirs = [null, ['N','E'], ['S','E'], ['S','W'], ['N','W']];
+  const [d0, d1] = dirs[p.q];
+  const secStr = p.sec === Math.floor(p.sec)
+    ? String(Math.floor(p.sec)).padStart(2,'0')
+    : p.sec.toFixed(1).padStart(4,'0');
+  return `${d0} ${p.deg}°${String(p.min).padStart(2,'0')}'${secStr}" ${d1}`;
+}
+
+// ============================================================
+// STATE
+// ============================================================
+
+let nextId = 1;
+let rows = [];  // [{ id, bearing, dist }]
+
+// ============================================================
+// CLOSURE MATH
+// ============================================================
+
+function computePoints() {
+  const pobN = parseFloat(document.getElementById('pobN').value) || 0;
+  const pobE = parseFloat(document.getElementById('pobE').value) || 0;
+  let n = pobN, e = pobE, total = 0;
+  const pts = [{ n, e }];
+  for (const r of rows) {
+    const az   = parseBearing(r.bearing);
+    const dist = parseFloat(r.dist);
+    if (az == null || isNaN(dist) || dist <= 0) { pts.push(null); continue; }
+    const rad = az * Math.PI / 180;
+    n += dist * Math.cos(rad);
+    e += dist * Math.sin(rad);
+    total += dist;
+    pts.push({ n, e });
+  }
+  return { pts, total, endN: n, endE: e, pobN, pobE };
+}
+
+function calcArea(pts) {
+  const valid = pts.filter(Boolean);
+  if (valid.length < 4) return 0;
+  let sum = 0;
+  const c = [...valid, valid[0]];
+  for (let i = 0; i < c.length - 1; i++)
+    sum += (c[i].e * c[i+1].n) - (c[i+1].e * c[i].n);
+  return Math.abs(sum / 2);
+}
+
+// ============================================================
+// RECALC + UI UPDATE
+// ============================================================
+
+const PREC_MIN  = 5000;
+const LERR_MAX  = 0.1;
+
+function recalc() {
+  const { pts, total, endN, endE, pobN, pobE } = computePoints();
+  const errN  = endN - pobN;
+  const errE  = endE - pobE;
+  const lerr  = Math.sqrt(errN * errN + errE * errE);
+  const validCount = rows.filter(r => {
+    const az = parseBearing(r.bearing);
+    const d  = parseFloat(r.dist);
+    return az != null && !isNaN(d) && d > 0;
+  }).length;
+
+  const prec   = total > 0 && lerr > 0.0001 ? total / lerr : null;
+  const closed = lerr < LERR_MAX
+              && (prec === null || prec >= PREC_MIN)
+              && validCount >= 3
+              && total > 0;
+
+  // Hero class
+  const hero = document.getElementById('hero');
+  hero.className = 'closure-hero' + (total === 0 ? '' : closed ? ' ok' : ' bad');
+
+  // Status + precision
+  const heroStatus = document.getElementById('heroStatus');
+  const heroPrec   = document.getElementById('heroPrec');
+  const heroDetail = document.getElementById('heroDetail');
+  const statTotal  = document.getElementById('statTotal');
+  const statLerr   = document.getElementById('statLerr');
+  const statArea   = document.getElementById('statArea');
+
+  if (total === 0) {
+    heroStatus.textContent = 'No calls entered';
+    heroPrec.textContent   = '—';
+    statTotal.textContent  = '—';
+    statLerr.textContent   = '—';
+    statArea.textContent   = '—';
+    heroDetail.textContent = '';
+  } else if (validCount < 3) {
+    heroStatus.textContent = `${validCount} of 3+ rows needed`;
+    heroPrec.textContent   = '—';
+    statTotal.textContent  = total.toFixed(2) + ' ft';
+    statLerr.textContent   = '—';
+    statArea.textContent   = '—';
+    heroDetail.textContent = '';
+  } else if (closed) {
+    heroStatus.textContent = '✓  Closed';
+    heroPrec.textContent   = prec === null ? 'perfect' : '1 : ' + Math.round(prec).toLocaleString();
+    statTotal.textContent  = total.toFixed(2) + ' ft';
+    statLerr.textContent   = lerr.toFixed(4) + ' ft';
+    const sqft = calcArea(pts);
+    const ac   = sqft / 43560;
+    statArea.textContent   = ac.toFixed(4) + ' ac';
+    heroDetail.textContent = sqft.toLocaleString(undefined, { maximumFractionDigits: 0 }) + ' sqft';
+  } else {
+    heroStatus.textContent = '✗  Not closed';
+    heroPrec.textContent   = prec === null ? '—' : '1 : ' + Math.round(prec).toLocaleString();
+    statTotal.textContent  = total.toFixed(2) + ' ft';
+    statLerr.textContent   = lerr.toFixed(4) + ' ft';
+    const reason = prec != null && prec < PREC_MIN
+      ? 'prec < 1:5,000'
+      : `lerr ≥ ${LERR_MAX} ft`;
+    statArea.textContent   = reason;
+    heroDetail.textContent = `ΔN ${errN >= 0 ? '+' : ''}${errN.toFixed(4)}  ΔE ${errE >= 0 ? '+' : ''}${errE.toFixed(4)}`;
+  }
+
+  // Per-row point coords + valid highlight
+  let ptIdx = 0;
+  for (const r of rows) {
+    ptIdx++;
+    const ptEl  = document.getElementById('pt-' + r.id);
+    const rowEl = document.getElementById('row-' + r.id);
+    const az    = parseBearing(r.bearing);
+    const dist  = parseFloat(r.dist);
+    const valid = az != null && !isNaN(dist) && dist > 0;
+    if (rowEl) rowEl.classList.toggle('valid-row', valid);
+    if (ptEl) {
+      const pt = pts[ptIdx];
+      if (pt && valid) {
+        ptEl.textContent = `N ${pt.n.toFixed(2)}  E ${pt.e.toFixed(2)}`;
+      } else if (!valid) {
+        ptEl.textContent = '(incomplete)';
+      } else {
+        ptEl.textContent = '';
+      }
+    }
+  }
+}
+
+// ============================================================
+// ROW MANAGEMENT
+// ============================================================
+
+function addRow() {
+  const id = nextId++;
+  rows.push({ id, bearing: '', dist: '' });
+  renderRows();
+  recalc();
+  setTimeout(() => {
+    const inp = document.getElementById('b-' + id);
+    if (inp) { inp.focus(); inp.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  }, 60);
+}
+
+function deleteRow(id) {
+  rows = rows.filter(r => r.id !== id);
+  renderRows();
+  recalc();
+}
+
+function onBearingInput(id, val) {
+  const r = rows.find(r => r.id === id);
+  if (r) r.bearing = val;
+  const dispEl = document.getElementById('bd-' + id);
+  const inp    = document.getElementById('b-' + id);
+  if (dispEl) {
+    const parsed = parseBearingParts(val);
+    const hasVal = val.trim().length > 0;
+    if (!hasVal) {
+      dispEl.textContent = '';
+      dispEl.className   = 'bearing-disp';
+    } else if (parsed) {
+      dispEl.textContent = bearDisp(val);
+      dispEl.className   = 'bearing-disp';
+    } else {
+      dispEl.textContent = '⚠ invalid — use format 145.3020';
+      dispEl.className   = 'bearing-disp err';
+    }
+    if (inp) inp.className = hasVal && !parsed ? 'inp-err' : '';
+  }
+  recalc();
+}
+
+function onDistInput(id, val) {
+  const r = rows.find(r => r.id === id);
+  if (r) r.dist = val;
+  recalc();
+}
+
+function confirmClear() {
+  if (rows.length === 0) return;
+  if (!confirm('Clear all ' + rows.length + ' row(s)?')) return;
+  rows = [];
+  renderRows();
+  recalc();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
+function renderRows() {
+  const list  = document.getElementById('callList');
+  const empty = document.getElementById('emptyState');
+  empty.style.display = rows.length === 0 ? '' : 'none';
+
+  list.innerHTML = rows.map((r, i) => {
+    const dispStr = bearDisp(r.bearing);
+    const hasVal  = r.bearing.trim().length > 0;
+    const valid   = parseBearingParts(r.bearing) != null;
+    const dispClass = hasVal && !valid ? 'bearing-disp err' : 'bearing-disp';
+    const dispText  = hasVal && !valid ? '⚠ invalid' : dispStr;
+    const inpClass  = hasVal && !valid ? 'inp-err' : '';
+    return `
+<div class="call-row" id="row-${r.id}">
+  <div class="call-row-top">
+    <span class="row-badge">${i + 1}</span>
+    <span class="row-pt" id="pt-${r.id}"></span>
+    <button class="row-del" onclick="deleteRow(${r.id})" aria-label="Delete">×</button>
+  </div>
+  <div class="call-row-fields">
+    <div class="call-field">
+      <label>Bearing code</label>
+      <input type="text"
+        id="b-${r.id}"
+        class="${inpClass}"
+        inputmode="numeric"
+        value="${esc(r.bearing)}"
+        placeholder="145.3020"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        oninput="onBearingInput(${r.id}, this.value)"
+      >
+      <div class="${dispClass}" id="bd-${r.id}">${esc(dispText)}</div>
+    </div>
+    <div class="call-field">
+      <label>Distance (ft)</label>
+      <input type="number"
+        id="d-${r.id}"
+        inputmode="decimal"
+        value="${esc(r.dist)}"
+        placeholder="0.00"
+        min="0"
+        step="0.01"
+        autocomplete="off"
+        oninput="onDistInput(${r.id}, this.value)"
+      >
+    </div>
+  </div>
+</div>`;
+  }).join('');
+}
+
+// ============================================================
+// COPY
+// ============================================================
+
+function copyTSV() {
+  if (rows.length === 0) { showToast('No rows to copy'); return; }
+  const { total, endN, endE, pobN, pobE } = computePoints();
+  const errN = endN - pobN, errE = endE - pobE;
+  const lerr = Math.sqrt(errN * errN + errE * errE);
+  const prec = total > 0 && lerr > 0.0001 ? Math.round(total / lerr) : null;
+  const lines = ['#\tCode\tBearing\tDistance (ft)'];
+  rows.forEach((r, i) => {
+    lines.push([i + 1, r.bearing, bearDisp(r.bearing), r.dist].join('\t'));
+  });
+  lines.push('');
+  lines.push(`Perimeter\t\t\t${total.toFixed(2)} ft`);
+  lines.push(`Linear error\t\t\t${lerr.toFixed(4)} ft`);
+  lines.push(`ΔN\t\t\t${errN.toFixed(4)} ft`);
+  lines.push(`ΔE\t\t\t${errE.toFixed(4)} ft`);
+  lines.push(`Precision\t\t\t${prec ? '1:' + prec.toLocaleString() : 'perfect'}`);
+  navigator.clipboard.writeText(lines.join('\n')).then(
+    () => showToast('Copied ' + rows.length + ' row' + (rows.length === 1 ? '' : 's')),
+    () => showToast('Copy failed — try Safari')
+  );
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+
+renderRows();
+recalc();
+
+// Add three blank rows so screen doesn't look empty on load
+addRow(); addRow(); addRow();
+</script>
+
+</body>
+</html>

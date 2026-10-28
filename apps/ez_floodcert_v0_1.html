@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EZ Flood Cert - FEMA Elevation Certificate fast-fill</title>
+<style>
+:root{
+  --bg:#0f1620; --bg2:#151d29; --panel:#1a2432; --panel2:#202c3c;
+  --line:#2c3a4e; --fg:#e6edf3; --fg-mute:#93a3b5; --fg-dim:#5c6c80;
+  --teal:#2dd4bf; --teal-dim:#0e7f74; --bronze:#c9a227; --amber:#f0b429;
+  --red:#e5534b; --green:#3fb950;
+  --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  --mono:'Cascadia Code','Consolas',monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.45}
+.masthead{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--bg2);position:sticky;top:0;z-index:20}
+.brand__mark{font-family:var(--mono);color:var(--bronze);font-weight:700;letter-spacing:1px}
+.brand__title{font-size:17px;font-weight:700;margin:0}
+.brand__tag{color:var(--fg-mute);font-size:12px}
+.toolbar{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.jobfield{display:flex;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+.jobfield label{font-size:11px;color:var(--fg-mute);text-transform:uppercase;letter-spacing:.5px}
+.jobfield input{background:transparent;border:none;color:var(--fg);font-family:var(--mono);font-size:13px;width:110px;outline:none}
+button{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+button:hover{border-color:var(--teal);color:var(--teal)}
+button.primary{background:var(--teal-dim);border-color:var(--teal);color:#04141a}
+button.primary:hover{background:var(--teal);color:#04141a}
+button.warn{color:var(--amber);border-color:var(--amber)}
+select,textarea{background:var(--panel);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:13px}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--teal)}
+main{max-width:1080px;margin:0 auto;padding:20px}
+.note-bar{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:6px;padding:10px 14px;margin-bottom:18px;color:var(--fg-mute);font-size:12.5px}
+.section{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:16px;overflow:hidden}
+.section>h2{margin:0;padding:10px 16px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.section>h2 .sec-id{font-family:var(--mono);color:var(--teal);font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+.section>h2 .sec-hint{color:var(--fg-dim);font-weight:400;font-size:12px;margin-left:auto}
+.section-body{padding:14px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field.full{grid-column:1 / -1}
+.field label{font-size:11px;color:var(--fg-mute);text-transform:uppercase;letter-spacing:.4px}
+.field label .req{color:var(--bronze)}
+.field input,.field select,.field textarea{width:100%}
+.field textarea{min-height:56px;resize:vertical}
+.field input.invalid{border-color:var(--red);background:#2a1517}
+.radio-row{display:flex;gap:6px;flex-wrap:wrap}
+.radio-row label{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--fg);text-transform:none;cursor:pointer;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:3px 8px}
+.radio-row label.on{border-color:var(--teal);color:var(--teal)}
+.legal{grid-column:1 / -1;background:var(--bg);border:1px solid var(--line);border-left:3px solid var(--bronze);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--fg-mute);font-style:italic}
+.subgrid{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;border-top:1px dashed var(--line);padding-top:12px;margin-top:4px}
+.subgrid h3{margin:0;font-size:12px;color:var(--bronze);grid-column:1 / -1;text-transform:uppercase;letter-spacing:.5px}
+.row-grid{grid-column:1 / -1;display:grid;grid-template-columns:220px 1fr 1fr 1fr;gap:8px;align-items:end}
+.row-grid .rhead{font-size:10px;color:var(--fg-dim);text-transform:uppercase;letter-spacing:.4px}
+.footer{margin:20px 0 60px;text-align:center;color:var(--fg-dim);font-size:11px;font-family:var(--mono)}
+#status{font-size:12px;color:var(--teal);font-family:var(--mono)}
+/* PRINT - clean black on white */
+@media print{
+  body{background:#fff;color:#000;font-size:11px}
+  .masthead,.toolbar,.note-bar,.footer{display:none!important}
+  main{max-width:none;padding:0}
+  .section{border:1px solid #000;border-radius:0;margin-bottom:8px;background:#fff;break-inside:avoid}
+  .section>h2{background:#eee;color:#000;border-bottom:1px solid #000}
+  .section>h2 .sec-id{color:#000;background:#fff;border:1px solid #000}
+  .section>h2 .sec-hint{display:none}
+  .field label{color:#000}
+  .field input,.field select,.field textarea{background:#fff;color:#000;border:1px solid #999}
+  .field input.invalid{background:#ffe5e5}
+  .radio-row label{background:#fff;border:1px solid #999;color:#000}
+  .radio-row label.on{border:2px solid #000;color:#000}
+  .legal{background:#f4f4f4;border:1px solid #000;color:#000}
+  .subgrid h3{color:#000}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <span class="brand__mark">EZ</span>
+  <h1 class="brand__title">Flood Cert</h1>
+  <span class="brand__tag">FEMA Elevation Certificate FF-206-FY-22-152 &middot; fast-fill v0.2</span>
+  <div class="toolbar">
+    <div class="jobfield"><label>Job #</label><input id="jobNum" placeholder="26-222"></div>
+    <div class="jobfield"><label>Client</label><input id="clientName" placeholder="Nix Lane"></div>
+    <select id="jobList" title="Saved jobs" style="max-width:150px"><option value="">-- saved --</option></select>
+    <button class="primary" onclick="saveJob()">Save</button>
+    <button onclick="exportJSON()">Export</button>
+    <button onclick="document.getElementById('importFile').click()">Import</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
+    <button onclick="window.print()">Print</button>
+    <button class="warn" onclick="newJob()">New</button>
+  </div>
+</header>
+
+<main>
+  <div class="note-bar" id="status">Butler firm defaults pre-loaded. Fill the job-specific fields, then Save + Print. Invalid input turns red. Tab moves between fields.</div>
+
+  <div class="section">
+    <h2><span class="sec-id">A</span> Property Information <span class="sec-hint">owner, situs, legal, building</span></h2>
+    <div class="section-body">
+      <div class="field"><label>A1 Building owner name <span class="req">*</span></label><input data-field="A1" placeholder="Christopher M. Butler"></div>
+      <div class="field"><label>A2 Building street address</label><input data-field="A2" placeholder="151 Nix Lane"></div>
+      <div class="field"><label>A3 Property description / TPN</label><input data-field="A3" placeholder="TPN 0123456789"></div>
+      <div class="field"><label>A4 Building use</label>
+        <select data-field="A4">
+          <option value="">-- select --</option><option>Residential</option><option>Accessory</option><option>Non-residential</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field"><label>A5 Latitude</label><input data-field="A5lat" data-validate="coord" placeholder="46.73932"></div>
+      <div class="field"><label>A5 Longitude</label><input data-field="A5lon" data-validate="coord" placeholder="-122.95957"></div>
+      <div class="field"><label>A5 Horizontal datum</label>
+        <div class="radio-row" data-radio="A5datum">
+          <label><input type="radio" name="A5datum" value="NAD83">NAD 83</label>
+          <label><input type="radio" name="A5datum" value="NAD83(2011)">NAD 83 (2011)</label>
+          <label><input type="radio" name="A5datum" value="WGS84">WGS 84</label>
+        </div>
+      </div>
+      <div class="field"><label>A7 Building diagram number</label><input data-field="A7" data-validate="int" placeholder="8"></div>
+      <div class="field"><label>A8a Crawlspace / enclosure sq ft</label><input data-field="A8a" data-validate="num" placeholder="0"></div>
+      <div class="field"><label>A8b Flood openings present</label>
+        <div class="radio-row" data-radio="A8b">
+          <label><input type="radio" name="A8b" value="Yes">Yes</label>
+          <label><input type="radio" name="A8b" value="No">No</label>
+          <label><input type="radio" name="A8b" value="NA">NA</label>
+        </div>
+      </div>
+      <div class="field"><label>A8c Non-engineered opening count</label><input data-field="A8cNon" data-validate="int" placeholder="0"></div>
+      <div class="field"><label>A8c Engineered opening count</label><input data-field="A8cEng" data-validate="int" placeholder="0"></div>
+      <div class="field"><label>A8d Total net open area (sq in)</label><input data-field="A8d" data-validate="num" placeholder="0"></div>
+      <div class="field"><label>A8e Engineered rated coverage (sq ft)</label><input data-field="A8e" data-validate="num" placeholder="0"></div>
+      <div class="field"><label>A8f Engineered cert attached</label>
+        <div class="radio-row" data-radio="A8f">
+          <label><input type="radio" name="A8f" value="Yes">Yes</label>
+          <label><input type="radio" name="A8f" value="No">No</label>
+        </div>
+      </div>
+      <div class="field"><label>A9 Attached garage (top of slab / openings)</label><input data-field="A9" placeholder="none"></div>
+    </div>
+  </div>
+
+  <!-- A6/A8 PHOTO OCR PANEL -->
+  <div class="section">
+    <h2><span class="sec-id">A6/A8</span> Foundation Photo Analysis <span class="sec-hint">phone photo &rarr; sq ft + vent auto-fill</span></h2>
+    <div class="section-body">
+      <div class="field full">
+        <label>Gemini API Key <span style="font-size:10px;color:var(--fg-dim)">(stored locally in browser only &mdash; used for vision OCR)</span></label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="geminiKey" type="password" placeholder="AIza..." style="font-family:var(--mono);flex:1">
+          <button onclick="saveGeminiKey()">Save Key</button>
+        </div>
+      </div>
+      <div class="field full">
+        <label>Foundation sketch &mdash; take or upload photo</label>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" onchange="previewPhoto(this)"
+          style="color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px;width:100%">
+      </div>
+      <div id="photoPreviewWrap" style="display:none;grid-column:1/-1">
+        <img id="photoPreview" style="max-width:100%;max-height:300px;border:1px solid var(--line);border-radius:6px;margin-top:4px;object-fit:contain">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;grid-column:1/-1">
+        <button class="primary" id="analyzeBtn" onclick="analyzePhoto()" disabled>&#128247; Analyze Photo</button>
+        <span id="ocrStatus" style="font-size:12px;color:var(--fg-mute);font-family:var(--mono)"></span>
+      </div>
+      <div id="ocrResults" style="display:none;grid-column:1/-1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:2px">
+        <div style="font-size:12px;font-weight:600;color:var(--teal);margin-bottom:10px;letter-spacing:.4px">EXTRACTED FROM PHOTO</div>
+        <div id="ocrResultBody"></div>
+        <div id="ocrFlagBar" style="display:none;background:#2a1517;border:1px solid var(--red);border-left:3px solid var(--red);border-radius:6px;padding:8px 12px;margin-top:10px;color:var(--red);font-size:12px;font-weight:600"></div>
+        <!-- Vent size calculator (shown when count known but size missing) -->
+        <div id="ventSizeCalc" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:10px 12px">
+          <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:6px">Vent size not in photo &mdash; enter to calculate A8d</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <input id="ventL" type="number" placeholder="8" style="width:60px;background:var(--panel);border:1px solid var(--line);color:var(--fg);border-radius:5px;padding:4px 6px;font-size:12px"> in
+            &times;
+            <input id="ventW" type="number" placeholder="16" style="width:60px;background:var(--panel);border:1px solid var(--line);color:var(--fg);border-radius:5px;padding:4px 6px;font-size:12px"> in
+            &times; <span id="ventCountDisplay" style="font-size:12px;color:var(--fg-mute)">? vents</span>
+            <button onclick="calcVentArea()" style="padding:4px 10px">= sq in</button>
+            <span id="ventAreaResult" style="font-size:13px;font-weight:700;color:var(--teal)"></span>
+            <button id="fillA8dCalcBtn" style="display:none;padding:4px 10px" onclick="fillA8dCalc()">Fill A8d</button>
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button id="fillA8aBtn" style="display:none" onclick="fillA8a()">Fill A8a (sq ft)</button>
+          <button id="fillA8bBtn" style="display:none" onclick="fillA8b()">Fill A8b (vents Y/N)</button>
+          <button id="fillA8cBtn" style="display:none" onclick="fillA8c()">Fill A8c (vent count)</button>
+          <button id="fillA8dBtn" style="display:none" onclick="fillA8d()">Fill A8d (total sq in)</button>
+          <button id="fillAllA8Btn" class="primary" style="display:none" onclick="fillAllA8()">&#10003; Fill All A8 Fields</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="sec-id">B</span> Flood Insurance Rate Map (FIRM) <span class="sec-hint">community, panel, BFE</span></h2>
+    <div class="section-body">
+      <div class="field"><label>B1.a NFIP community name</label><input data-field="B1a" value="City of Centralia"></div>
+      <div class="field"><label>B1.b Community number (CID)</label><input data-field="B1b" data-validate="int" placeholder="530103"></div>
+      <div class="field"><label>B2 County</label><input data-field="B2" value="Lewis"></div>
+      <div class="field"><label>B3 State (FIPS)</label><input data-field="B3" data-validate="fips" value="47" style="width:70px"><span style="font-size:11px;color:var(--fg-dim);align-self:center">= WA</span></div>
+      <div class="field"><label>B4 FIRM panel number</label><input data-field="B4" placeholder="53067C 0212"></div>
+      <div class="field"><label>B5 FIRM suffix</label><input data-field="B5" placeholder=""></div>
+      <div class="field"><label>B6 FIRM index date</label><input data-field="B6" data-validate="date" type="date" value="1981-12-15"></div>
+      <div class="field"><label>B7 FIRM effective/revised date</label><input data-field="B7" data-validate="date" type="date"></div>
+      <div class="field"><label>B8 Flood zone</label><input data-field="B8" placeholder="AE"></div>
+      <div class="field"><label>B9 Base Flood Elevation (ft)</label><input data-field="B9" placeholder="or 'Not established'"></div>
+      <div class="field"><label>B10 BFE source</label>
+        <div class="radio-row" data-radio="B10">
+          <label><input type="radio" name="B10" value="FIS">FIS</label>
+          <label><input type="radio" name="B10" value="FIRM">FIRM</label>
+          <label><input type="radio" name="B10" value="Community">Community</label>
+          <label><input type="radio" name="B10" value="Other">Other</label>
+        </div>
+      </div>
+      <div class="field"><label>B11 Elevation datum</label>
+        <div class="radio-row" data-radio="B11">
+          <label><input type="radio" name="B11" value="NGVD29" checked>NGVD 29</label>
+          <label><input type="radio" name="B11" value="NAVD88">NAVD 88</label>
+          <label><input type="radio" name="B11" value="Other">Other</label>
+        </div>
+      </div>
+      <div class="field"><label>B12 CBRS / OPA</label>
+        <div class="radio-row" data-radio="B12">
+          <label><input type="radio" name="B12" value="Yes">Yes</label>
+          <label><input type="radio" name="B12" value="No" checked>No</label>
+        </div>
+      </div>
+      <div class="field"><label>B13 LOMR amended</label>
+        <div class="radio-row" data-radio="B13">
+          <label><input type="radio" name="B13" value="Yes">Yes</label>
+          <label><input type="radio" name="B13" value="No" checked>No</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="sec-id">C</span> Building Elevation Information <span class="sec-hint">benchmark, datum, C2.a-h elevations</span></h2>
+    <div class="section-body">
+      <div class="field"><label>C1 Construction stage</label>
+        <div class="radio-row" data-radio="C1">
+          <label><input type="radio" name="C1" value="1">1 CDRWG</label>
+          <label><input type="radio" name="C1" value="2">2 Under const.</label>
+          <label><input type="radio" name="C1" value="3" checked>3 Finished</label>
+        </div>
+      </div>
+      <div class="field"><label>C2 Benchmark used</label><input data-field="C2bmk" placeholder="BM #12, 187.40"></div>
+      <div class="field"><label>C2 Vertical datum</label><input data-field="C2datum" value="NGVD 29"></div>
+      <div class="field"><label>C2 Grade type</label>
+        <div class="radio-row" data-radio="C2grade">
+          <label><input type="radio" name="C2grade" value="Natural">Natural</label>
+          <label><input type="radio" name="C2grade" value="Finished">Finished</label>
+        </div>
+      </div>
+      <div class="row-grid">
+        <span></span><span class="rhead">Elevation (ft)</span><span class="rhead">Feet</span><span class="rhead">Meters</span>
+        <label style="font-size:12px">C2.a Top of bottom floor</label><input data-field="C2a" data-validate="num"><label class="radio-row" style="align-items:center"><input type="radio" name="C2aU" value="ft" checked> ft</label><label class="radio-row" style="align-items:center"><input type="radio" name="C2aU" value="m"> m</label>
+        <label style="font-size:12px">C2.b Top of next higher floor</label><input data-field="C2b" data-validate="num"><label class="radio-row" style="align-items:center"><input type="radio" name="C2bU" value="ft" checked> ft</label><label class="radio-row" style="align-items:center"><input type="radio" name="C2bU" value="m"> m</label>
+        <label style="font-size:12px">C2.c Bottom lowest horiz. member</label><input data-field="C2c" data-validate="num"><label class="radio-row" style="align-items:center"><input type="radio" name="C2cU" value="ft" checked> ft</label><label class="radio-row" style="align-items:center"><input type="radio" name="C2cU" value="m"> m</label>
+        <label style="font-size:12px">C2.d Attached garage (slab)</label><input data-field="C2d" data-validate="num"><label class="radio-row" style="align-items:center"><input type="radio" name="C2dU" value="ft" checked> ft</label><label class="radio-row" style="align-items:center"><input type="radio" name="C2dU" value="m"> m</label>
+        <label style="font-size:12px">C2.e Lowest machinery/equipment</label><input data-field="C2e" data-validate="num"><label class="radio-row" style="align-items:center"><input type="radio" name="C2eU" value="ft" checked> ft</label><label class="radio-row" style="align-items:center"><input type="radio" name="C2eU" value="m"> m</label>
+        <label style="font-size:12px">C2.f Lowest adjacent grade (LAG)</label><input data-field="C2f" data-validate="num"><label class="radio-row" style="align-items:center"><input type="radio" name="C2fU" value="ft" checked> ft</label><label class="radio-row" style="align-items:center"><input type="radio" name="C2fU" value="m"> m</label>
+        <label style="font-size:12px">C2.g Highest adjacent grade (HAG)</label><input data-field="C2g" data-validate="num"><label class="radio-row" style="align-items:center"><input type="radio" name="C2gU" value="ft" checked> ft</label><label class="radio-row" style="align-items:center"><input type="radio" name="C2gU" value="m"> m</label>
+        <label style="font-size:12px">C2.h LAG at deck/stairs</label><input data-field="C2h" data-validate="num"><label class="radio-row" style="align-items:center"><input type="radio" name="C2hU" value="ft" checked> ft</label><label class="radio-row" style="align-items:center"><input type="radio" name="C2hU" value="m"> m</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="sec-id">D</span> Surveyor Certification <span class="sec-hint">Butler defaults &mdash; verify, set date, comment</span></h2>
+    <div class="section-body">
+      <div class="field"><label>Certifying surveyor</label><input data-field="DcertName" value="Christopher M. Butler"></div>
+      <div class="field"><label>License number</label><input data-field="Dlicense" value="WAPLS 36792"></div>
+      <div class="field"><label>Title</label><input data-field="Dtitle" value="Professional Land Surveyor"></div>
+      <div class="field"><label>Company</label><input data-field="Dcompany" value="Butler Surveying Inc."></div>
+      <div class="field"><label>Address</label><input data-field="Daddr" value="P.O. Box 149"></div>
+      <div class="field"><label>City</label><input data-field="Dcity" value="Chehalis"></div>
+      <div class="field"><label>State</label><input data-field="Dstate" data-validate="fips" value="47" style="width:70px"></div>
+      <div class="field"><label>ZIP</label><input data-field="Dzip" value="98532"></div>
+      <div class="field"><label>Telephone</label><input data-field="Dtel" value="360-748-8803"></div>
+      <div class="field"><label>Email</label><input data-field="Demail" value="office@butlersurveying.net"></div>
+      <div class="field"><label>Certification date</label><input data-field="Ddate" data-validate="date" type="date"></div>
+      <div class="field full"><label>Comments</label><textarea data-field="Dcomments" placeholder="e.g. Lowest adjacent grade (C2.f) is 187.7 ft NGVD 29..."></textarea></div>
+      <div class="legal">This certification is to be signed and sealed by a land surveyor, engineer, or architect authorized by state law to certify elevation information. I certify that the information on this Certificate represents my best efforts to interpret the data available. I understand that any false statement may be punishable by fine or imprisonment under 18 U.S. Code, Section 1001.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="sec-id">H</span> First Floor Height <span class="sec-hint">8/23 addition</span></h2>
+    <div class="section-body">
+      <div class="field"><label>H1.a Top of bottom floor above LAG</label><input data-field="H1a" data-validate="num" placeholder="0.00"></div>
+      <div class="field"><label>H1.b Top of next higher floor above LAG</label><input data-field="H1b" data-validate="num" placeholder="2.90"></div>
+      <div class="field"><label>H2 Floodproofing present</label>
+        <div class="radio-row" data-radio="H2">
+          <label><input type="radio" name="H2" value="Yes">Yes</label>
+          <label><input type="radio" name="H2" value="No">No</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="sec-id">I</span> Preparer <span class="sec-hint">who filled this out</span></h2>
+    <div class="section-body">
+      <div class="field"><label>Preparer name</label><input data-field="Iname" value="Christopher M. Butler, PLS"></div>
+      <div class="field"><label>Preparer address</label><input data-field="Iaddr" value="P.O. Box 149, Chehalis WA 98532"></div>
+      <div class="field"><label>Preparer date</label><input data-field="Idate" data-validate="date" type="date"></div>
+      <div class="field"><label>Attachments</label>
+        <div class="radio-row" data-radio="Iattach">
+          <label><input type="radio" name="Iattach" value="Yes">Yes</label>
+          <label><input type="radio" name="Iattach" value="No" checked>No</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">EZ Flood Cert v0.2 &middot; single-file, offline, no cloud &middot; data stays in your browser (localStorage) &middot; not a substitute for proofing against the source form</div>
+</main>
+
+<script>
+const STORE = 'ez_floodcert_v1';
+const DEFAULTS = {
+  B1a:'City of Centralia', B2:'Lewis', B3:'47',
+  B6:'1981-12-15', B11:'NGVD29',
+  DcertName:'Christopher M. Butler', Dlicense:'WAPLS 36792', Dtitle:'Professional Land Surveyor',
+  Dcompany:'Butler Surveying Inc.', Daddr:'P.O. Box 149', Dcity:'Chehalis', Dstate:'47',
+  Dzip:'98532', Dtel:'360-748-8803', Demail:'office@butlersurveying.net',
+  Iname:'Christopher M. Butler, PLS', Iaddr:'P.O. Box 149, Chehalis WA 98532'
+};
+
+function $(id){ return document.getElementById(id); }
+function all(sel){ return Array.from(document.querySelectorAll(sel)); }
+
+function applyDefaults(){
+  for (const [k,v] of Object.entries(DEFAULTS)) {
+    const el = document.querySelector(`[data-field="${k}"]`);
+    if (el && !el.value) el.value = v;
+  }
+  if (!$('Ddate').value) $('Ddate').value = new Date().toISOString().split('T')[0];
+  if (!$('Idate').value) $('Idate').value = new Date().toISOString().split('T')[0];
+}
+
+function gather(){
+  const data = {};
+  all('[data-field]').forEach(el => {
+    if (el.type === 'radio') return; // handled per-group below
+    data[el.getAttribute('data-field')] = el.value;
+  });
+  // radio groups (checked value)
+  all('[data-radio]').forEach(group => {
+    const g = group.getAttribute('data-radio');
+    const checked = group.querySelector('input[type=radio]:checked');
+    if (checked) data[g] = checked.value;
+  });
+  // per-row units (C2a..h)
+  ['a','b','c','d','e','f','g','h'].forEach(x => {
+    const c = document.querySelector(`input[name="C2${x}U"]:checked`);
+    if (c) data['C2'+x+'U'] = c.value;
+  });
+  return data;
+}
+
+function hydrate(data){
+  for (const [k,v] of Object.entries(data)) {
+    const el = document.querySelector(`[data-field="${k}"]`);
+    if (el && k.indexOf('U') !== 0) { if (el.type === 'date') el.value = v; else el.value = v; }
+    if (k.indexOf('U') === 0 || ['A5datum','A8b','A8f','B10','B11','B12','B13','C1','C2grade','H2','Iattach'].includes(k)) {
+      const radios = document.querySelectorAll(`input[type=radio]`);
+      radios.forEach(r => { if (r.value === v) r.checked = true; });
+    }
+  }
+  // unit radios for C2 rows
+  ['a','b','c','d','e','f','g','h'].forEach(x => {
+    const v = data['C2'+x+'U'];
+    if (v) { const r = document.querySelector(`input[name="C2${x}U"][value="${v}"]`); if (r) r.checked = true; }
+  });
+  refreshRadioStyles();
+}
+
+function loadStore(){ try { return JSON.parse(localStorage.getItem(STORE)) || {jobs:{}}; } catch(e){ return {jobs:{}}; } }
+function saveStore(s){ localStorage.setItem(STORE, JSON.stringify(s)); }
+
+function saveJob(){
+  const jobNum = $('jobNum').value.trim();
+  if (!jobNum) { status('Enter a Job # first (e.g. 26-222).', 'red'); $('jobNum').focus(); return; }
+  const store = loadStore();
+  store.jobs[jobNum] = { client: $('clientName').value.trim(), data: gather(), saved: new Date().toISOString() };
+  saveStore(store);
+  refreshJobList();
+  status('Saved job ' + jobNum + ' to this browser (localStorage).', 'ok');
+}
+
+function loadJob(jobNum){
+  const store = loadStore();
+  const job = store.jobs[jobNum];
+  if (!job) { status('No saved job ' + jobNum + '.', 'red'); return; }
+  resetForm(true);
+  $('jobNum').value = jobNum;
+  $('clientName').value = job.client || '';
+  hydrate(job.data);
+  refreshRadioStyles();
+  status('Loaded job ' + jobNum + '.', 'ok');
+}
+
+function refreshJobList(){
+  const store = loadStore();
+  const sel = $('jobList');
+  sel.innerHTML = '<option value="">-- saved --</option>';
+  Object.keys(store.jobs).sort().forEach(k => {
+    const o = document.createElement('option'); o.value = k; o.textContent = k + ' ' + (store.jobs[k].client ? '('+store.jobs[k].client+')' : ''); sel.appendChild(o);
+  });
+}
+$('jobList').addEventListener('change', e => { if (e.target.value) loadJob(e.target.value); });
+
+function exportJSON(){
+  const data = { job: $('jobNum').value.trim(), client: $('clientName').value.trim(), data: gather(), exported: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'floodcert_' + (data.job || 'job').replace(/[^A-Za-z0-9_-]/g,'') + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  status('Exported JSON for job ' + (data.job || '(unnamed)') + '.', 'ok');
+}
+
+function importJSON(input){
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const obj = JSON.parse(r.result);
+      if (!obj.data) { status('Import failed: not a flood cert export.', 'red'); return; }
+      $('jobNum').value = obj.job || ''; $('clientName').value = obj.client || '';
+      hydrate(obj.data); refreshRadioStyles();
+      status('Imported job ' + (obj.job || '(unnamed)') + '.', 'ok');
+    } catch(e){ status('Import failed: bad JSON.', 'red'); }
+  };
+  r.readAsText(f);
+  input.value = '';
+}
+
+function resetForm(keepHeader){
+  all('[data-field]').forEach(el => { el.value = ''; });
+  all('input[type=radio]').forEach(r => r.checked = false);
+  // re-apply stable defaults (B11 datum, radio checked)
+  const b11 = document.querySelector('input[name="B11"][value="NGVD29"]'); if (b11) b11.checked = true;
+  const b12 = document.querySelector('input[name="B12"][value="No"]'); if (b12) b12.checked = true;
+  const b13 = document.querySelector('input[name="B13"][value="No"]'); if (b13) b13.checked = true;
+  const c1 = document.querySelector('input[name="C1"][value="3"]'); if (c1) c1.checked = true;
+  const iatt = document.querySelector('input[name="Iattach"][value="No"]'); if (iatt) iatt.checked = true;
+  applyDefaults();
+  refreshRadioStyles();
+  if (!keepHeader) { $('jobNum').value = ''; $('clientName').value = ''; }
+}
+
+function newJob(){
+  if (Object.keys(gather()).some(k => { const el = document.querySelector(`[data-field="${k}"]`); return el && el.value; })) {
+    if (!confirm('Clear the form for a new job? Unsaved changes will be lost.')) return;
+  }
+  resetForm(false);
+  status('New job. Butler defaults re-applied.', 'ok');
+}
+
+function refreshRadioStyles(){
+  all('.radio-row').forEach(row => {
+    const checked = row.querySelector('input[type=radio]:checked');
+    row.querySelectorAll('label').forEach(l => l.classList.remove('on'));
+    if (checked && checked.closest('label')) checked.closest('label').classList.add('on');
+  });
+}
+all('input[type=radio]').forEach(r => r.addEventListener('change', refreshRadioStyles));
+
+// validation: turn invalid red immediately
+all('[data-validate]').forEach(el => {
+  const v = el.getAttribute('data-validate');
+  el.addEventListener('input', () => {
+    let ok = true;
+    if (el.value.trim() === '') ok = true;
+    else if (v === 'int') ok = /^\d+$/.test(el.value.trim());
+    else if (v === 'num') ok = !isNaN(parseFloat(el.value));
+    else if (v === 'coord') ok = !isNaN(parseFloat(el.value));
+    else if (v === 'fips') ok = /^\d{2}$/.test(el.value.trim());
+    else if (v === 'date') ok = /^\d{4}-\d{2}-\d{2}$/.test(el.value);
+    el.classList.toggle('invalid', !ok);
+  });
+});
+
+function status(msg, kind){
+  const s = $('status');
+  s.textContent = msg;
+  s.style.color = kind === 'red' ? 'var(--red)' : kind === 'ok' ? 'var(--teal)' : 'var(--fg-mute)';
+  if (kind === 'red') s.style.borderLeftColor = 'var(--red)';
+  else s.style.borderLeftColor = 'var(--amber)';
+}
+
+applyDefaults();
+refreshRadioStyles();
+refreshJobList();
+// Load saved Gemini key
+{ const k = localStorage.getItem('ez_gemini_key'); if (k && $('geminiKey')) $('geminiKey').value = k; }
+
+// ── PHOTO OCR ──────────────────────────────────────────────────────────────
+let _ocrData = null;
+
+function saveGeminiKey(){
+  const k = $('geminiKey').value.trim();
+  if (!k){ ocrSt('Enter a key first.','red'); return; }
+  localStorage.setItem('ez_gemini_key', k);
+  ocrSt('Key saved.','ok');
+}
+
+function previewPhoto(input){
+  const file = input.files[0]; if (!file) return;
+  $('photoPreview').src = URL.createObjectURL(file);
+  $('photoPreviewWrap').style.display = '';
+  $('analyzeBtn').disabled = false;
+  ocrSt('Photo loaded — click Analyze.','');
+  _ocrData = null;
+  $('ocrResults').style.display = 'none';
+}
+
+function ocrSt(msg, kind){
+  const el = $('ocrStatus');
+  el.textContent = msg;
+  el.style.color = kind==='ok' ? 'var(--teal)' : kind==='red' ? 'var(--red)' : 'var(--fg-mute)';
+}
+
+async function analyzePhoto(){
+  const key = localStorage.getItem('ez_gemini_key') || $('geminiKey').value.trim();
+  if (!key){ ocrSt('Set a Gemini API key first.','red'); return; }
+  const file = $('photoInput').files[0];
+  if (!file){ ocrSt('Upload a photo first.','red'); return; }
+  $('analyzeBtn').disabled = true;
+  ocrSt('Sending to Gemini vision…','');
+  try {
+    const b64 = await new Promise((res,rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result.split(',')[1]);
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+    const resp = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key,
+      { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ contents:[{parts:[
+          { text: `You are reading a hand-drawn field sketch of a building foundation/crawlspace for a FEMA Elevation Certificate Section A8.
+
+Return ONLY a JSON object — no prose, no markdown fences — with these fields:
+{
+  "dimensions": [{"label":"Main","length_ft":40,"width_ft":25}],
+  "sqft_total": 1000,
+  "irregular": false,
+  "vents_found": true,
+  "vent_notes_raw": "4 - 8x16 vents N+S walls",
+  "vent_count": 4,
+  "vent_size_in": "8 x 16",
+  "vent_area_each_sqin": 128,
+  "total_vent_area_sqin": 512,
+  "flag": false,
+  "flag_reason": "",
+  "raw_text": "all legible text from sketch"
+}
+Rules:
+1. sqft_total = sum of all rectangle components (L ft x W ft each).
+2. If L-shape or offset, set irregular=true and list each rectangle in dimensions[].
+3. If NO vent notes visible at all: vents_found=false, flag=true, flag_reason="No flood vent notes found — FEMA requires flood openings for enclosed areas below BFE. A8b cannot be left blank."
+4. vent_area_each_sqin = length_in * width_in. total_vent_area_sqin = vent_count * vent_area_each_sqin.
+5. If vent size not written on sketch: vent_area_each_sqin=null, total_vent_area_sqin=null.` },
+          { inline_data:{ mime_type: file.type||'image/jpeg', data: b64 } }
+        ]}],
+        generationConfig:{ temperature:0.1, maxOutputTokens:1024 }
+      })
+    });
+    if (!resp.ok){ const e=await resp.json().catch(()=>({})); throw new Error(e.error?.message||'Gemini API error '+resp.status); }
+    const payload = await resp.json();
+    const txt = payload.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const match = txt.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON in response. Got: ' + txt.slice(0,200));
+    _ocrData = JSON.parse(match[0]);
+    _renderOcr(_ocrData);
+    ocrSt('Done.','ok');
+  } catch(e){ ocrSt('Error: '+e.message,'red'); console.error(e); }
+  $('analyzeBtn').disabled = false;
+}
+
+function _renderOcr(d){
+  const rows = [];
+  (d.dimensions||[]).forEach(dim => {
+    const sf = (dim.length_ft||0)*(dim.width_ft||0);
+    rows.push(`<div style="font-size:12px;margin-bottom:4px"><span style="color:var(--fg-mute)">${dim.label||'Area'}</span> &nbsp;<strong>${dim.length_ft} ft &times; ${dim.width_ft} ft</strong> &nbsp;= ${sf.toLocaleString()} sq ft</div>`);
+  });
+  if (d.sqft_total!=null)
+    rows.push(`<div style="font-size:13px;font-weight:700;color:var(--teal);border-top:1px solid var(--line);padding-top:6px;margin-bottom:10px">TOTAL: ${Math.round(d.sqft_total).toLocaleString()} sq ft${d.irregular?' (irregular)':''}</div>`);
+  if (d.vents_found){
+    rows.push(`<div style="font-size:12px;margin-bottom:3px"><span style="color:var(--fg-mute)">Openings found:</span> <strong>${d.vent_count}</strong>${d.vent_size_in?' &nbsp;@ '+d.vent_size_in+' in each':''}</div>`);
+    if (d.total_vent_area_sqin!=null)
+      rows.push(`<div style="font-size:12px;margin-bottom:3px"><span style="color:var(--fg-mute)">Total net open area:</span> <strong>${d.total_vent_area_sqin} sq in</strong></div>`);
+    if (d.vent_notes_raw)
+      rows.push(`<div style="font-size:11px;color:var(--fg-dim);margin-top:2px;font-style:italic">"${d.vent_notes_raw}"</div>`);
+  } else {
+    rows.push(`<div style="font-size:12px;color:var(--fg-mute)">No vent information in photo.</div>`);
+  }
+  if (d.raw_text)
+    rows.push(`<details style="margin-top:8px"><summary style="font-size:11px;color:var(--fg-dim);cursor:pointer">Raw text from sketch</summary><pre style="font-size:10px;color:var(--fg-dim);white-space:pre-wrap;margin:4px 0 0">${d.raw_text}</pre></details>`);
+  $('ocrResultBody').innerHTML = rows.join('');
+  const fb = $('ocrFlagBar');
+  if (d.flag && d.flag_reason){ fb.textContent = '⚠ FLAG: '+d.flag_reason; fb.style.display=''; }
+  else fb.style.display='none';
+  $('fillA8aBtn').style.display = d.sqft_total!=null?'':'none';
+  $('fillA8bBtn').style.display = d.vents_found!=null?'':'none';
+  $('fillA8cBtn').style.display = d.vent_count!=null?'':'none';
+  $('fillA8dBtn').style.display = d.total_vent_area_sqin!=null?'':'none';
+  $('fillAllA8Btn').style.display = '';
+  // Show vent size calc if count known but area not in photo
+  const needSizeCalc = d.vent_count!=null && d.total_vent_area_sqin==null;
+  $('ventSizeCalc').style.display = needSizeCalc?'':'none';
+  if (needSizeCalc) { $('ventCountDisplay').textContent = d.vent_count+' vents'; _calcVentAreaSqin=null; $('ventAreaResult').textContent=''; $('fillA8dCalcBtn').style.display='none'; }
+  $('ocrResults').style.display = '';
+}
+
+function fillA8a(){ if (!_ocrData?.sqft_total) return; const el=document.querySelector('[data-field="A8a"]'); if(el){el.value=Math.round(_ocrData.sqft_total); status('A8a filled: '+Math.round(_ocrData.sqft_total)+' sq ft.','ok');} }
+function fillA8b(){ if (!_ocrData) return; const v=_ocrData.vents_found?'Yes':'No'; const r=document.querySelector(`input[name="A8b"][value="${v}"]`); if(r){r.checked=true; refreshRadioStyles(); status('A8b filled: vents '+v+'.','ok');} }
+function fillA8c(){ if (!_ocrData?.vent_count) return; const el=document.querySelector('[data-field="A8cNon"]'); if(el){el.value=_ocrData.vent_count; status('A8c non-eng count filled: '+_ocrData.vent_count+'. Adjust if any are engineered.','ok');} }
+function fillA8d(){ if (_ocrData?.total_vent_area_sqin==null) return; const el=document.querySelector('[data-field="A8d"]'); if(el){el.value=_ocrData.total_vent_area_sqin; status('A8d filled: '+_ocrData.total_vent_area_sqin+' sq in.','ok');} }
+function fillAllA8(){ fillA8a(); fillA8b(); fillA8c(); fillA8d(); status('All A8 fields filled from photo. Review before saving.','ok'); }
+
+let _calcVentAreaSqin = null;
+function calcVentArea(){
+  const l = parseFloat($('ventL').value), w = parseFloat($('ventW').value);
+  const count = _ocrData?.vent_count || 0;
+  if (!l||!w||!count){ $('ventAreaResult').textContent='Enter length, width, and analyze photo first.'; return; }
+  _calcVentAreaSqin = Math.round(l * w * count);
+  $('ventAreaResult').textContent = _calcVentAreaSqin + ' sq in';
+  $('fillA8dCalcBtn').style.display = '';
+}
+function fillA8dCalc(){
+  if (_calcVentAreaSqin==null) return;
+  const el=document.querySelector('[data-field="A8d"]');
+  if(el){ el.value=_calcVentAreaSqin; status('A8d filled: '+_calcVentAreaSqin+' sq in (calculated from vent size entry).','ok'); }
+}
+</script>
+</body>
+</html>

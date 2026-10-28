@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Butler Surveying - Job Board v2 (Conveyor + Timeline + Client View)</title>
+<style>
+:root {
+  --panel: #f4f1ea;
+  --ink: #1a1a1a;
+  --line: #c9c2b3;
+  --accent: #7a5c3a;
+  --accent-dark: #5c4429;
+  --done: #4a7c59;
+  --warn: #b3541e;
+  --card: #ffffff;
+  --late: #a33;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Segoe UI", Tahoma, sans-serif; background: var(--panel); color: var(--ink); padding: 16px; }
+h1 { font-size: 1.4rem; letter-spacing: 0.04em; color: var(--accent-dark); border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-bottom: 8px; }
+h2 { font-size: 1rem; color: var(--accent-dark); margin: 8px 0 6px; }
+.subtitle { font-size: 0.85rem; color: #666; margin-bottom: 12px; }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+button, .btn { background: var(--accent); color: #fff; border: none; padding: 8px 14px; font-size: 0.9rem; border-radius: 4px; cursor: pointer; }
+button:hover { background: var(--accent-dark); }
+button.danger { background: var(--warn); }
+button.small { padding: 4px 8px; font-size: 0.75rem; }
+input, select, textarea { font-size: 0.9rem; padding: 5px 8px; border: 1px solid var(--line); border-radius: 3px; background: #fff; }
+label { font-size: 0.85rem; color: #444; }
+.note { font-size: 0.78rem; color: #777; font-style: italic; }
+.statusbar { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; font-size: 0.85rem; margin-bottom: 12px; }
+.statusbar .ok { color: var(--done); font-weight: 600; }
+.statusbar .warn { color: var(--warn); font-weight: 600; }
+
+/* client view overlay */
+#clientView {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  display: none; align-items: center; justify-content: center; z-index: 50;
+}
+#clientView.open { display: flex; }
+.client-card {
+  background: #fff; border-radius: 8px; padding: 24px; width: 420px; max-width: 92vw;
+  box-shadow: 0 6px 30px rgba(0,0,0,0.4); text-align: center;
+}
+.client-card h2 { margin-bottom: 4px; }
+.client-card .stage-big { font-size: 1.5rem; font-weight: 700; color: var(--accent-dark); margin: 12px 0 4px; }
+.client-card .date-line { font-size: 1.05rem; color: #333; margin-bottom: 12px; }
+.client-card .bar { height: 14px; background: #e5e0d4; border-radius: 7px; overflow: hidden; margin: 12px 0; }
+.client-card .bar > div { height: 100%; background: var(--accent); transition: width 0.3s; }
+.client-card .fine { font-size: 0.72rem; color: #999; margin-top: 14px; }
+.client-card .close-x { position: absolute; top: 12px; right: 16px; font-size: 1.4rem; cursor: pointer; color: #888; }
+.client-input { font-size: 1.1rem; text-align: center; letter-spacing: 0.05em; width: 180px; }
+
+/* new job panel */
+#newJobPanel { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 14px; margin-bottom: 18px; display: none; }
+#newJobPanel.open { display: block; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 14px; }
+.grid .full { grid-column: 1 / -1; }
+.grid label { display: block; margin-bottom: 3px; }
+.fee-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.fee-line input { width: 110px; }
+.recording-hint { color: var(--warn); font-weight: 600; }
+
+/* board */
+#board { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
+.stage { background: #ece8de; border: 1px solid var(--line); border-radius: 6px; min-width: 240px; width: 240px; flex-shrink: 0; display: flex; flex-direction: column; }
+.stage-header { padding: 8px 10px; font-weight: 600; font-size: 0.82rem; letter-spacing: 0.03em; color: #fff; border-radius: 5px 5px 0 0; display: flex; justify-content: space-between; align-items: center; }
+.stage-header .count { background: rgba(255,255,255,0.25); border-radius: 10px; padding: 1px 8px; font-size: 0.75rem; }
+.stage-body { padding: 8px; min-height: 80px; display: flex; flex-direction: column; gap: 8px; }
+.stage.s0 .stage-header { background: #8a7b5d; }
+.stage.s1 .stage-header { background: #7a5c3a; }
+.stage.s2 .stage-header { background: #6b7b8c; }
+.stage.s3 .stage-header { background: #5d6b7a; }
+.stage.s4 .stage-header { background: #4c6b8a; }
+.stage.s5 .stage-header { background: #4a7c59; }
+.stage.s6 .stage-header { background: #3f6b7a; }
+.stage.s7 .stage-header { background: #6a4c93; }
+.stage.s8 .stage-header { background: #2f6b4f; }
+.stage.s9 .stage-header { background: #444; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 8px; cursor: grab; box-shadow: 0 1px 2px rgba(0,0,0,0.08); font-size: 0.82rem; }
+.card:active { cursor: grabbing; }
+.card.dragging { opacity: 0.5; }
+.card .jobno { font-weight: 700; color: var(--accent-dark); font-size: 0.85rem; }
+.card .jname { margin: 2px 0; }
+.card .meta { color: #666; font-size: 0.75rem; }
+.card .flag { display: inline-block; margin-top: 4px; font-size: 0.7rem; font-weight: 600; padding: 1px 6px; border-radius: 3px; }
+.card .flag.record { background: #e8f0e8; color: #2f6b4f; }
+.card .flag.exhibit { background: #f0ece0; color: #6b5c2f; }
+.card .flag.rec-fee { background: #f5e3dc; color: var(--warn); }
+.card .flag.no-fee { background: #e8f0e8; color: #2f6b4f; }
+.card .flag.late { background: #f5dcdc; color: var(--late); }
+.card .flag.on-time { background: #e8f0e8; color: #2f6b4f; }
+.card .eta { margin-top: 3px; font-size: 0.75rem; font-weight: 600; }
+.card .eta.overdue { color: var(--late); }
+.card .eta.on-track { color: #2f6b4f; }
+.card .flag.blocked { background: #f5dcdc; color: var(--late); }
+.card .block-reason { margin-top: 3px; font-size: 0.72rem; color: var(--late); font-style: italic; }
+.card .btn-row { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+.card input.stage-jump { width: 34px; padding: 2px; font-size: 0.75rem; }
+
+/* detail */
+#detailPanel { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 14px; margin-top: 14px; display: none; }
+#detailPanel.open { display: block; }
+table.log-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 8px; }
+table.log-table th, table.log-table td { border: 1px solid var(--line); padding: 4px 6px; text-align: left; }
+table.log-table th { background: var(--panel); }
+#countyFormsPanel { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px; margin-top: 12px; }
+.checklist-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.checklist-item input[type=checkbox] { transform: scale(1.1); }
+
+/* feed actions (field/drafter quick buttons) */
+.feed-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; align-items: center; }
+.feed-row button { background: #5d6b7a; }
+.feed-row button.field { background: #4c6b8a; }
+.feed-row button.draft { background: #4a7c59; }
+.feed-row button.pls { background: #6a4c93; }
+
+/* wall display mode */
+body.wallmode { background: #111; padding: 8px; }
+body.wallmode h1, body.wallmode .subtitle, body.wallmode .toolbar, body.wallmode #newJobPanel, body.wallmode #detailPanel, body.wallmode .statusbar { display: none; }
+body.wallmode #board { gap: 6px; padding: 0; }
+body.wallmode .stage { min-width: 0; width: 100%; flex: 1; border-color: #333; }
+body.wallmode .stage-header { font-size: 1.1rem; padding: 10px 12px; }
+body.wallmode .stage-body { padding: 6px; gap: 6px; }
+body.wallmode .card { font-size: 1.0rem; padding: 10px 12px; cursor: default; }
+body.wallmode .card .jobno { font-size: 1.25rem; }
+body.wallmode .card .jname { font-size: 1.1rem; }
+body.wallmode .card .btn-row { display: none; }
+#wallSummary { display: none; }
+body.wallmode #wallSummary { display: block; color: #eee; font-size: 1.3rem; padding: 6px 10px 12px; }
+#wallSummary .badge { display: inline-block; padding: 4px 14px; border-radius: 14px; margin-right: 10px; font-weight: 600; }
+#wallSummary .b-active { background: #2f6b4f; }
+#wallSummary .b-blocked { background: #a33; }
+#wallSummary .b-overdue { background: #b3541e; }
+#wallSummary .b-done { background: #555; }
+</style>
+</head>
+<body>
+
+<h1>Butler Surveying &mdash; Job Board v2</h1>
+<div class="subtitle">Conveyor belt + projected finish timeline + client status view. Every input (receptionist, timecard, field, calendar) writes to the same job record, so the answer to "where is my survey" is always one look away.</div>
+
+<div class="statusbar" id="statusbar">
+  <span class="warn">Storage: local (this browser only).</span>
+  <span id="storageInfo"> Not shared between machines yet.</span>
+  <button class="small" onclick="connectSharedFile()" style="margin-left:10px">Connect shared OneDrive file</button>
+  <button class="small" onclick="exportJson()">Export JSON</button>
+  <button class="small" onclick="importJson()">Import JSON</button>
+</div>
+
+<div id="wallSummary"></div>
+
+<div class="toolbar">
+  <button id="btnNewJob" onclick="openNewJob()">+ New Job (Intake Call)</button>
+  <button onclick="toggleWall()">Wall Display (TV / office screen)</button>
+  <button onclick="loadDemoData()">Load Demo Data (sample jobs)</button>
+  <button onclick="openClientLookup()">Client Status Lookup</button>
+  <button class="danger" onclick="if(confirm('Wipe ALL jobs from local storage?')){localStorage.removeItem('butlerJobBoardV2');board=[];saveBoard();renderBoard();}">Reset</button>
+  <span class="note">Drag cards to move stages. "&gt;&gt;" advances one. Click Open for roadblock + dates.</span>
+</div>
+
+<div id="newJobPanel">
+  <h2>INTAKE &mdash; Receptionist phone call</h2>
+  <div class="grid">
+    <div><label>Job Number</label><input id="nj_number" placeholder="e.g. 26-049"></div>
+    <div><label>Client Name</label><input id="nj_client" placeholder="Last, First / Company"></div>
+    <div><label>Client Phone</label><input id="nj_phone" placeholder="(360) xxx-xxxx"></div>
+    <div><label>Property / Site Address</label><input id="nj_prop" placeholder="Site address"></div>
+    <div><label>Tax Parcel Number</label><input id="nj_parcel" placeholder="e.g. 012345-678-000-0000"></div>
+    <div><label>County</label><select id="nj_county"><option>Lewis</option><option>Thurston</option><option>Cowlitz</option><option>Wahkiakum</option><option>Pacific</option><option>Grays Harbor</option><option>Pierce</option><option>Other / Multi</option></select></div>
+    <div><label>Survey Type</label><select id="nj_type"><option value="Resurvey">Resurvey (mom &amp; pop / boundary)</option><option value="Timber">Timber</option><option value="EO Line">EO Line (cell tower)</option><option value="Subdivision">Subdivision (Short/Long Plat)</option><option value="Flood Cert">Flood Cert</option><option value="Exhibit Map">Exhibit Map</option><option value="Record of Survey">Record of Survey</option><option value="ALTA">ALTA</option><option value="BLA">BLA</option><option value="Construction Staking">Construction Staking</option><option value="Topo">Topo</option><option value="Other">Other</option></select></div>
+    <div><label>What the survey is for</label><input id="nj_purpose" placeholder="sale of 5 ac, timber harvest, ADU, fence line..."></div>
+    <div><label>Promise date to client (if any)</label><input id="nj_promise" type="date"></div>
+    <div class="full">
+      <label>Recording / filing needed?</label>
+      <select id="nj_record"><option value="auto">Auto (decide from survey type)</option><option value="yes">YES - goes to county for recording</option><option value="no">NO - deliver direct to client (exhibit only)</option></select>
+      <span class="note">Exhibit Maps and any map where no corner is set go DIRECT to client - no recording fee.</span>
+    </div>
+    <div class="full fee-line"><label>Recording fee:</label><input id="nj_recordfee" type="number" value="420" step="5"><span class="note">Lewis Co ~$420, varies - verify at intake</span></div>
+    <div class="full fee-line"><label>Other fees:</label><input id="nj_otherfee" type="number" value="0" step="5"><span class="note">extra pages, certified copies, county surcharge</span></div>
+    <div class="full"><label>Intake notes</label><textarea id="nj_notes" rows="2" style="width:100%"></textarea></div>
+    <div class="full">
+      <button onclick="addJob()">Add Job to Board</button>
+      <button onclick="document.getElementById('newJobPanel').classList.remove('open')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="board"></div>
+
+<div id="detailPanel">
+  <h2 id="detailTitle">Job Detail</h2>
+  <div class="grid">
+    <div><label>Client</label><div id="dt_client"></div></div>
+    <div><label>Phone</label><div id="dt_phone"></div></div>
+    <div><label>Property</label><div id="dt_prop"></div></div>
+    <div><label>Tax Parcel #</label><div id="dt_parcel"></div></div>
+    <div><label>County</label><div id="dt_county"></div></div>
+    <div><label>Type</label><div id="dt_type"></div></div>
+    <div><label>Purpose</label><div id="dt_purpose"></div></div>
+    <div><label>Recording?</label><div id="dt_record"></div></div>
+    <div><label>Total fees (client cost)</label><div id="dt_totalfee" style="font-weight:700"></div></div>
+    <div><label>Started (intake date)</label><div id="dt_created"></div></div>
+    <div><label>Promise date</label><div id="dt_promise"></div></div>
+    <div><label>Projected finish (auto)</label><div id="dt_proj" style="font-weight:700"></div></div>
+    <div><label>Status</label><div id="dt_status"></div></div>
+  </div>
+
+  <h2 style="margin-top:10px">Calendar / schedule (saved with job)</h2>
+  <div class="feed-row">
+    <label>Field date:</label><input id="dt_fielddate" type="date" onchange="setJobDate('fieldDate',this.value)">
+    <label>PLS review:</label><input id="dt_plsdate" type="date" onchange="setJobDate('plsDate',this.value)">
+    <label>Target finish:</label><input id="dt_targetdate" type="date" onchange="setJobDate('targetDate',this.value)">
+  </div>
+
+  <h2 style="margin-top:10px">Roadblock</h2>
+  <div class="feed-row">
+    <select id="dt_block" onchange="setBlock(this.value)">
+      <option value="">No roadblock (moving fine)</option>
+      <option value="WAITING ON CLIENT">WAITING ON CLIENT (info, signature, decision)</option>
+      <option value="WAITING ON COUNTY">WAITING ON COUNTY (permits, recording, backlog)</option>
+      <option value="WAITING ON WEATHER">WAITING ON WEATHER</option>
+      <option value="WAITING ON OWNER/ATTORNEY">WAITING ON OWNER / ATTORNEY</option>
+      <option value="WAITING ON PLS">WAITING ON PLS SCHEDULE</option>
+      <option value="REVISIONS NEEDED">REVISIONS NEEDED</option>
+      <option value="OTHER">OTHER (note in log)</option>
+    </select>
+    <span class="note">Surfaces as a red flag on the board and in wall display.</span>
+  </div>
+
+  <h2 style="margin-top:10px">Feed actions (quick stage updates)</h2>
+  <div class="feed-row">
+    <button class="field" onclick="feedAction('FIELD DONE - Cassey')">Field done (Cassey logs)</button>
+    <button class="draft" onclick="feedAction('DRAFTING STARTED - timecard')">Drafter working (timecard)</button>
+    <button class="pls" onclick="feedAction('PLS REVIEW DONE')">PLS review done</button>
+    <button class="small" onclick="feedAction('READY TO SEND')">Ready to send</button>
+  </div>
+
+  <div><label>Notes</label><p id="dt_notes"></p></div>
+
+  <div id="countyFormsPanel"><h2>County forms checklist</h2><div id="countyFormsList" class="checklist-item"></div><button class="small" onclick="addCustomForm()">+ add custom form</button></div>
+
+  <h2 style="margin-top:12px">Timeline / Status log</h2>
+  <table class="log-table"><thead><tr><th>When</th><th>Stage</th><th>Note</th></tr></thead><tbody id="dt_log"></tbody></table>
+  <div class="btn-row" style="margin-top:10px">
+    <button class="small" onclick="advanceDetail()">Advance to next stage</button>
+    <button class="small danger" onclick="closeDetail()">Close</button>
+  </div>
+</div>
+
+<!-- CLIENT STATUS VIEW (what a client sees on the website) -->
+<div id="clientView">
+  <div class="client-card">
+    <span class="close-x" onclick="closeClientLookup()">&times;</span>
+    <h2>Butler Surveying</h2>
+    <div class="subtitle">Job status check</div>
+    <input id="cv_number" class="client-input" placeholder="Job number">
+    <br><br>
+    <button onclick="clientLookup()">Check status</button>
+    <div id="cv_result" style="margin-top:14px">
+      <div class="stage-big" id="cv_stage">--</div>
+      <div class="date-line" id="cv_proj">Enter your job number above.</div>
+      <div class="bar"><div id="cv_bar" style="width:0%"></div></div>
+      <div class="fine" id="cv_fine">Butler Surveying - Lewis County, WA</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ STAGES ============
+const STAGES = [
+  { id: 0, name: "INTAKE", typicalDays: 0 },
+  { id: 1, name: "RESEARCH", typicalDays: 2 },
+  { id: 2, name: "BID", typicalDays: 3 },
+  { id: 3, name: "CONTRACT", typicalDays: 2 },
+  { id: 4, name: "FIELD", typicalDays: 3 },
+  { id: 5, name: "DRAFTING", typicalDays: 10 },
+  { id: 6, name: "PLS REVIEW", typicalDays: 4 },
+  { id: 7, name: "READY TO SEND", typicalDays: 1 },
+  { id: 8, name: "RECORDING", typicalDays: 5 },
+  { id: 9, name: "COMPLETE", typicalDays: 0 }
+];
+const RECORD_TYPES = ["Short Plat", "Record of Survey", "ALTA", "BLA", "Construction Staking"];
+const EXHIBIT_TYPES = ["Exhibit Map", "Flood Cert", "Topo"];
+const DEFAULT_RECORD_FEE = 420;
+const COUNTY_FORMS = {
+  "Lewis": ["Application for Short Plat", "SEPA Environmental Checklist", "Recording cover sheet", "Tax parcel map / legal description", "Filing fee sheet (county)"],
+  "Thurston": ["Application (county)", "SEPA checklist", "Recording cover sheet", "Legal description / parcel map", "Filing fee sheet (county)"],
+  "Cowlitz": ["Application (county)", "SEPA checklist", "Recording cover sheet", "Legal description / parcel map", "Filing fee sheet (county)"],
+  "Wahkiakum": ["Application (county)", "SEPA checklist", "Recording cover sheet", "Legal description / parcel map", "Filing fee sheet (county)"],
+  "Pacific": ["Application (county)", "SEPA checklist", "Recording cover sheet", "Legal description / parcel map", "Filing fee sheet (county)"],
+  "Grays Harbor": ["Application (county)", "SEPA checklist", "Recording cover sheet", "Legal description / parcel map", "Filing fee sheet (county)"],
+  "Pierce": ["Application (county)", "SEPA checklist", "Recording cover sheet", "Legal description / parcel map", "Filing fee sheet (county)"],
+  "Other / Multi": ["Check county requirements", "SEPA checklist (if applicable)", "Recording cover sheet"]
+};
+const LS_KEY = "butlerJobBoardV2";
+
+let board = [];
+let currentDetailId = null;
+let dragId = null;
+let fileHandle = null;
+
+function uid() { return 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function recordType(t) { return RECORD_TYPES.includes(t); }
+function exhibitType(t) { return EXHIBIT_TYPES.includes(t); }
+function defaultRecordChoice(t) { return exhibitType(t) ? "no" : "yes"; }
+
+function todayStr() { return new Date().toISOString().slice(0,10); }
+function addDays(dateStr, days) { const d = new Date(dateStr + "T12:00:00"); d.setDate(d.getDate() + days); return d.toISOString().slice(0,10); }
+
+// ============ PROJECTED FINISH ============
+// Sum typical days for remaining stages from the job's current stage.
+// If a targetDate is set, that wins. If promiseDate set, show both.
+function projectedFinish(job) {
+  if (job.targetDate) return { date: job.targetDate, source: "target" };
+  if (job.stage >= STAGES.length - 1) return { date: todayStr(), source: "done" };
+  let days = 0;
+  for (let i = job.stage; i < STAGES.length; i++) days += STAGES[i].typicalDays;
+  const base = job.stageHistory && job.stageHistory[0] ? job.stageHistory[0].date : (job.createdDate || todayStr());
+  return { date: addDays(base, days), source: "auto" };
+}
+
+function jobStatus(job) {
+  if (job.stage === 9) return { label: "COMPLETE", late: false, pct: 100 };
+  const proj = projectedFinish(job);
+  const late = proj.date < todayStr();
+  const pct = Math.round((job.stage / (STAGES.length - 1)) * 100);
+  return { label: STAGES[job.stage].name, late: late, pct: pct, proj: proj };
+}
+
+// ============ NEW JOB ============
+function openNewJob() { document.getElementById('newJobPanel').classList.add('open'); }
+function addJob() {
+  const num = document.getElementById('nj_number').value.trim();
+  const client = document.getElementById('nj_client').value.trim();
+  if (!num && !client) { alert("Enter at least a job number or client name."); return; }
+  const type = document.getElementById('nj_type').value;
+  let record = document.getElementById('nj_record').value;
+  if (record === 'auto') record = defaultRecordChoice(type);
+  const recFee = parseFloat(document.getElementById('nj_recordfee').value) || DEFAULT_RECORD_FEE;
+  const otherFee = parseFloat(document.getElementById('nj_otherfee').value) || 0;
+  const created = todayStr();
+  const job = {
+    id: uid(), number: num || "(no #)", client: client || "(unnamed)",
+    phone: document.getElementById('nj_phone').value.trim(),
+    property: document.getElementById('nj_prop').value.trim(),
+    parcel: document.getElementById('nj_parcel').value.trim(),
+    county: document.getElementById('nj_county').value,
+    type: type, purpose: document.getElementById('nj_purpose').value.trim(),
+    record: record, recordFee: recFee, otherFee: otherFee,
+    feeTotal: (record === 'yes' ? recFee : 0) + otherFee,
+    notes: document.getElementById('nj_notes').value.trim(),
+    createdDate: created,
+    promiseDate: document.getElementById('nj_promise').value || "",
+    fieldDate: "", plsDate: "", targetDate: "",
+    block: "",
+    stage: 0, stageHistory: [{ stage: 0, date: created }],
+    forms: { checked: {}, custom: [] },
+    log: [{ when: new Date().toLocaleString(), stage: "INTAKE", note: "Intake call. Job created." }]
+  };
+  board.push(job); saveBoard(); clearNewJobForm();
+  document.getElementById('newJobPanel').classList.remove('open');
+  renderBoard();
+}
+function clearNewJobForm() {
+  ['nj_number','nj_client','nj_phone','nj_prop','nj_parcel','nj_purpose','nj_notes'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('nj_record').value='auto';
+  document.getElementById('nj_recordfee').value=DEFAULT_RECORD_FEE;
+  document.getElementById('nj_otherfee').value=0;
+  document.getElementById('nj_promise').value='';
+}
+
+// ============ RENDER ============
+function renderBoard() {
+  const el = document.getElementById('board'); el.innerHTML='';
+  STAGES.forEach(s => {
+    const jobs = board.filter(j => j.stage === s.id);
+    const col = document.createElement('div'); col.className='stage s'+s.id; col.dataset.stage=s.id;
+    col.addEventListener('dragover', e => e.preventDefault());
+    col.addEventListener('drop', e => { e.preventDefault(); if (dragId) moveJob(dragId, s.id); dragId=null; });
+    const hdr = document.createElement('div'); hdr.className='stage-header';
+    hdr.innerHTML = '<span>'+s.name+'</span><span class="count">'+jobs.length+'</span>';
+    col.appendChild(hdr);
+    const body = document.createElement('div'); body.className='stage-body';
+    jobs.forEach(j => body.appendChild(makeCard(j)));
+    col.appendChild(body); el.appendChild(col);
+  });
+}
+function makeCard(j) {
+  const c = document.createElement('div'); c.className='card'; c.draggable=true; c.dataset.id=j.id;
+  c.addEventListener('dragstart', e => { dragId=j.id; c.classList.add('dragging'); });
+  c.addEventListener('dragend', () => { c.classList.remove('dragging'); dragId=null; });
+  const st = jobStatus(j);
+  const feeLine = j.record === 'yes'
+    ? '<span class="flag rec-fee">RECORD + $'+j.feeTotal.toFixed(2)+'</span>'
+    : '<span class="flag no-fee">DIRECT - no rec fee</span>';
+  let blockHtml = '';
+  if (j.block) blockHtml = '<span class="flag blocked">BLOCKED: '+esc(j.block)+'</span>';
+  let etaHtml = '';
+  if (j.stage < 9) {
+    const proj = projectedFinish(j);
+    const late = proj.date < todayStr();
+    etaHtml = '<div class="eta '+(late?'overdue':'on-track')+'">'+(late?'OVERDUE - was ':'ETA: ')+proj.date+(proj.source==='target'?' (target)':'')+'</div>';
+  }
+  c.innerHTML =
+    '<div class="jobno">'+esc(j.number)+' &middot; '+esc(j.type)+'</div>'+
+    '<div class="jname">'+esc(j.client)+'</div>'+
+    '<div class="meta">'+esc(j.county)+(j.property?' &middot; '+esc(j.property):'')+(j.parcel?'<br>Parcel: '+esc(j.parcel):'')+'</div>'+
+    '<div>'+feeLine+blockHtml+'</div>'+etaHtml+
+    '<div class="btn-row">'+
+      '<button class="small" onclick="openDetail(\''+j.id+'\')">Open</button>'+
+      '<button class="small" onclick="advance(\''+j.id+'\')">&gt;&gt;</button>'+
+      '<input class="stage-jump" type="number" min="0" max="9" placeholder="stg" onchange="jumpTo(this.value,\''+j.id+'\')">'+
+    '</div>';
+  return c;
+}
+
+// ============ MOVE ============
+function moveJob(id, stage) {
+  const j = board.find(x => x.id===id); if (!j) return;
+  if (j.stage !== stage) {
+    j.stage = stage;
+    if (!j.stageHistory) j.stageHistory = [];
+    j.stageHistory.push({ stage: stage, date: todayStr() });
+    j.log.push({ when: new Date().toLocaleString(), stage: STAGES[stage].name, note: "Moved to "+STAGES[stage].name });
+  }
+  saveBoard(); renderBoard();
+}
+function advance(id) { const j = board.find(x => x.id===id); if (j && j.stage < 9) moveJob(id, j.stage+1); }
+function jumpTo(val, id) { const s=parseInt(val); if (isNaN(s)||s<0||s>9){renderBoard();return;} moveJob(id,s); }
+
+// ============ FEED ACTIONS ============
+// These are what Cassey/drafter/PLS use. Each maps to a stage + logs who did it.
+function feedAction(label) {
+  if (!currentDetailId) return;
+  const j = board.find(x => x.id === currentDetailId); if (!j) return;
+  let target = null;
+  if (label.indexOf('FIELD DONE') === 0) target = 4; // field completed, stays in field stage done
+  if (label.indexOf('DRAFTING STARTED') === 0) target = 5;
+  if (label.indexOf('PLS REVIEW DONE') === 0) target = 6;
+  if (label.indexOf('READY TO SEND') === 0) target = 7;
+  if (target !== null && target > j.stage) {
+    j.stage = target;
+    j.stageHistory.push({ stage: target, date: todayStr() });
+    j.log.push({ when: new Date().toLocaleString(), stage: STAGES[target].name, note: label });
+    if (label.indexOf('FIELD DONE') === 0 && !j.fieldDate) j.fieldDate = todayStr();
+    saveBoard(); renderBoard(); openDetail(currentDetailId);
+  }
+}
+function setJobDate(field, val) {
+  const j = board.find(x => x.id === currentDetailId); if (!j) return;
+  j[field] = val;
+  j.log.push({ when: new Date().toLocaleString(), stage: STAGES[j.stage].name, note: field + " set to " + val });
+  saveBoard(); openDetail(currentDetailId);
+}
+function setBlock(val) {
+  const j = board.find(x => x.id === currentDetailId); if (!j) return;
+  j.block = val;
+  j.log.push({ when: new Date().toLocaleString(), stage: STAGES[j.stage].name, note: "Roadblock: " + (val || "cleared") });
+  saveBoard(); renderBoard(); openDetail(currentDetailId);
+}
+
+// ============ DETAIL ============
+function openDetail(id) {
+  const j = board.find(x => x.id===id); if (!j) return;
+  currentDetailId = id;
+  const st = jobStatus(j);
+  document.getElementById('detailTitle').textContent = j.number+' - '+j.client;
+  document.getElementById('dt_client').textContent = j.client;
+  document.getElementById('dt_phone').textContent = j.phone||'--';
+  document.getElementById('dt_prop').textContent = j.property||'--';
+  document.getElementById('dt_parcel').textContent = j.parcel||'--';
+  document.getElementById('dt_county').textContent = j.county;
+  document.getElementById('dt_type').textContent = j.type;
+  document.getElementById('dt_purpose').textContent = j.purpose||'--';
+  document.getElementById('dt_record').textContent = j.record==='yes'?'YES - county recording':'NO - direct to client (exhibit)';
+  document.getElementById('dt_totalfee').textContent = '$'+j.feeTotal.toFixed(2);
+  document.getElementById('dt_created').textContent = j.createdDate||'--';
+  document.getElementById('dt_promise').textContent = j.promiseDate||'--';
+  const proj = projectedFinish(j);
+  document.getElementById('dt_proj').textContent = proj.date + (proj.source==='target'?' (target)':' (auto)');
+  document.getElementById('dt_status').textContent = st.label + (st.late ? ' - OVERDUE' : '');
+  document.getElementById('dt_notes').textContent = j.notes||'--';
+  document.getElementById('dt_fielddate').value = j.fieldDate||'';
+  document.getElementById('dt_plsdate').value = j.plsDate||'';
+  document.getElementById('dt_targetdate').value = j.targetDate||'';
+  document.getElementById('dt_block').value = j.block||'';
+  renderLog(j); renderForms(j);
+  document.getElementById('detailPanel').classList.add('open');
+}
+function closeDetail() { document.getElementById('detailPanel').classList.remove('open'); currentDetailId=null; }
+function advanceDetail() { if (currentDetailId){ advance(currentDetailId); openDetail(currentDetailId); } }
+function renderLog(j) {
+  const tbody = document.getElementById('dt_log'); tbody.innerHTML='';
+  j.log.slice().reverse().forEach(l => {
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+esc(l.when)+'</td><td>'+esc(l.stage)+'</td><td>'+esc(l.note||'')+'</td>';
+    tbody.appendChild(tr);
+  });
+}
+function renderForms(j) {
+  const list=document.getElementById('countyFormsList'); list.innerHTML='';
+  const base=(COUNTY_FORMS[j.county]||COUNTY_FORMS["Other / Multi"]).concat(j.forms.custom||[]);
+  base.forEach((f,idx)=>{
+    const key='f'+idx; const label=document.createElement('label'); label.className='checklist-item';
+    const cb=document.createElement('input'); cb.type='checkbox';
+    cb.checked=!!(j.forms.checked&&j.forms.checked[key]);
+    cb.onchange=()=>{ j.forms.checked[key]=cb.checked; saveBoard(); };
+    label.appendChild(cb); label.appendChild(document.createTextNode(' '+f)); list.appendChild(label);
+  });
+}
+function addCustomForm() {
+  const j=board.find(x=>x.id===currentDetailId); if(!j)return;
+  const name=prompt("Custom form name:"); if(!name||!name.trim())return;
+  j.forms.custom.push(name.trim()); saveBoard(); renderForms(j);
+}
+
+// ============ WALL DISPLAY MODE ============
+// Full-screen TV view: every active job, stage, roadblock, one glance.
+let wallOn = false;
+function toggleWall() {
+  wallOn = !wallOn;
+  document.body.classList.toggle('wallmode', wallOn);
+  if (wallOn) { closeDetail(); renderWallSummary(); }
+  renderBoard();
+}
+function renderWallSummary() {
+  const el = document.getElementById('wallSummary');
+  const active = board.filter(j => j.stage < 9).length;
+  const blocked = board.filter(j => j.block && j.stage < 9).length;
+  const overdue = board.filter(j => { if (j.stage >= 9) return false; return projectedFinish(j).date < todayStr(); }).length;
+  const done = board.filter(j => j.stage === 9).length;
+  el.innerHTML =
+    '<span class="badge b-active">ACTIVE: ' + active + '</span>' +
+    '<span class="badge b-blocked">BLOCKED: ' + blocked + '</span>' +
+    '<span class="badge b-overdue">OVERDUE: ' + overdue + '</span>' +
+    '<span class="badge b-done">COMPLETE: ' + done + '</span>';
+}
+// auto-refresh wall every 60s so the office screen stays live
+setInterval(() => { if (wallOn) { renderBoard(); renderWallSummary(); } }, 60000);
+
+// ============ DEMO DATA ============
+// Sample jobs so the board can be shown working without real client data.
+function loadDemoData() {
+  if (board.length && !confirm('Replace current jobs with demo data?')) return;
+  const d = (daysAgo) => { const dt = new Date(); dt.setDate(dt.getDate() - daysAgo); return dt.toISOString().slice(0,10); };
+  const mk = (num, client, type, county, purpose, stage, daysAgo, opts) => {
+    opts = opts || {};
+    const created = d(daysAgo);
+    const j = {
+      id: uid(), number: num, client: client, phone: "(360) 555-01" + String(Math.floor(Math.random()*90)+10),
+      property: opts.property || "", parcel: opts.parcel || "", county: county, type: type, purpose: purpose,
+      record: opts.record || defaultRecordChoice(type),
+      recordFee: DEFAULT_RECORD_FEE, otherFee: 0,
+      feeTotal: (opts.record === 'yes' || (!opts.record && !exhibitType(type))) ? DEFAULT_RECORD_FEE : 0,
+      notes: opts.notes || "", createdDate: created,
+      promiseDate: opts.promiseDate || "", fieldDate: opts.fieldDate || "",
+      plsDate: "", targetDate: opts.targetDate || "", block: opts.block || "",
+      stage: stage, stageHistory: [{ stage: 0, date: created }],
+      forms: { checked: {}, custom: [] },
+      log: [{ when: new Date().toLocaleString(), stage: STAGES[0].name, note: "Demo job created." }]
+    };
+    for (let s = 1; s <= stage; s++) j.log.push({ when: new Date().toLocaleString(), stage: STAGES[s].name, note: "Moved to " + STAGES[s].name });
+    return j;
+  };
+  board = [
+    mk("26-041", "Smith, Robert", "Exhibit Map", "Lewis", "Timber harvest exhibit", 2, 6, { property: "5 ac, Hwy 6", targetDate: d(-1), block: "WAITING ON CLIENT" }),
+    mk("26-042", "Henderson Family", "Short Plat", "Lewis", "Split 5 ac into 2 lots", 5, 18, { property: "Pe Ell Rd", promiseDate: d(9) }),
+    mk("26-043", "Olsen, Karen", "ALTA", "Cowlitz", "Bank refinance", 3, 9, { property: "Maple St" }),
+    mk("26-044", "Timberline LLC", "Construction Staking", "Lewis", "Building pad staking", 4, 12, { property: "I-5 corridor", fieldDate: d(3), block: "WAITING ON WEATHER" }),
+    mk("26-045", "Garcia, Miguel", "Record of Survey", "Thurston", "Boundary line dispute", 6, 24, { property: "T11N R2W", promiseDate: d(5) }),
+    mk("26-046", "Mountain View Farm", "Topo", "Wahkiakum", "Site topo for barn", 1, 4, { property: "Hwy 4" }),
+    mk("26-047", "Chen, Wei", "Flood Cert", "Lewis", "FEMA flood cert", 9, 8, { property: "Flood zone A" }),
+    mk("26-048", "Peterson, Dale", "Short Plat", "Pierce", "3-lot short plat", 7, 30, { property: "Graham", targetDate: d(-4), block: "WAITING ON COUNTY", promiseDate: d(-3) }),
+    mk("26-049", "Wilson, Annie", "BLA", "Lewis", "Building line adjustment", 0, 1, { property: "Winlock" })
+  ];
+  saveBoard(); renderBoard(); renderWallSummary();
+  document.getElementById('storageInfo').innerHTML = ' Demo data loaded (' + board.length + ' jobs).';
+}
+
+// ============ CLIENT STATUS VIEW ============
+// What a client sees: job number -> stage + projected date. Nothing private.
+function openClientLookup() {
+  document.getElementById('cv_number').value='';
+  document.getElementById('cv_stage').textContent='--';
+  document.getElementById('cv_proj').textContent='Enter your job number above.';
+  document.getElementById('cv_bar').style.width='0%';
+  document.getElementById('clientView').classList.add('open');
+}
+function closeClientLookup() { document.getElementById('clientView').classList.remove('open'); }
+function clientLookup() {
+  const num = document.getElementById('cv_number').value.trim().toUpperCase();
+  const j = board.find(x => x.number.toUpperCase() === num);
+  if (!j) {
+    document.getElementById('cv_stage').textContent = 'Not found';
+    document.getElementById('cv_proj').textContent = 'That job number was not found. Call the office.';
+    document.getElementById('cv_bar').style.width = '0%';
+    return;
+  }
+  const st = jobStatus(j);
+  document.getElementById('cv_stage').textContent = st.label;
+  if (j.stage === 9) {
+    document.getElementById('cv_proj').textContent = 'Completed. Ready for delivery.';
+  } else {
+    const proj = projectedFinish(j);
+    document.getElementById('cv_proj').textContent = 'Estimated completion: ' + proj.date;
+  }
+  document.getElementById('cv_bar').style.width = st.pct + '%';
+}
+
+// ============ SHARED STORAGE (OneDrive file via File System Access API) ============
+// Chrome/Edge only. Pick the shared jobs.json in OneDrive once; every machine
+// that opens the same file sees the same board. Conflicts are possible if two
+// machines write within the same minute (low risk at this volume).
+function connectSharedFile() {
+  if (!window.showOpenFilePicker) { alert("This browser does not support shared files. Use Chrome or Edge."); return; }
+  (async () => {
+    try {
+      const [handle] = await window.showOpenFilePicker({ types: [{ description: 'Butler jobs JSON', accept: { 'application/json': ['.json'] } }] });
+      fileHandle = handle;
+      const file = await handle.getFile();
+      const text = await file.text();
+      if (text && text.trim()) {
+        const data = JSON.parse(text);
+        if (Array.isArray(data)) { board = data; saveBoard(); renderBoard(); }
+      }
+      document.getElementById('storageInfo').innerHTML = ' Shared file: <b>' + handle.name + '</b> - now syncing to this file.';
+      document.getElementById('statusbar').querySelector('span').className = 'ok';
+      alert('Connected to ' + handle.name + '. This machine now reads and writes the shared jobs file.');
+    } catch (e) { alert('Could not open shared file: ' + e.message); }
+  })();
+}
+function saveBoard() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(board));
+    if (fileHandle && window.showSaveFilePicker) {
+      // write-through to the shared file
+      fileHandle.requestPermission ? fileHandle.requestPermission({mode:'readwrite'}) : null;
+      const w = awaitFileHandle();
+    }
+  } catch (e) { console.error(e); }
+}
+async function awaitFileHandle() {
+  try {
+    const w = await fileHandle.createWritable();
+    await w.write(JSON.stringify(board, null, 2));
+    await w.close();
+  } catch (e) { console.error('shared write failed (will retry):', e); }
+}
+function exportJson() {
+  const blob = new Blob([JSON.stringify(board, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'butler_jobs_' + todayStr() + '.json';
+  a.click();
+}
+function importJson() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = () => {
+    const f = inp.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const data = JSON.parse(r.result);
+        if (Array.isArray(data)) { board = data; saveBoard(); renderBoard(); alert('Imported ' + data.length + ' jobs.'); }
+        else alert('File is not a jobs array.');
+      } catch (e) { alert('Bad JSON: ' + e.message); }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+function loadBoard() {
+  try { const raw = localStorage.getItem(LS_KEY); board = raw ? JSON.parse(raw) : []; }
+  catch (e) { board = []; }
+}
+</script>
+</body>
+</html>

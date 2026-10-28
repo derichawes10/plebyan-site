@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plebyan — Job Card</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#15171c; --panel:#1e2128; --panel2:#262a33; --border:#343a45;
+    --fg:#e6e8ec; --mute:#9aa3b2; --amber:#d4a040; --amber2:#b88a2e;
+    --teal:#00e5d1; --green:#2ecc71; --red:#e05050; --yellow:#e0b040;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:14px}
+  .top{background:#11131a;border-bottom:1px solid var(--border);padding:10px 18px;display:flex;gap:14px;align-items:center;position:sticky;top:0;z-index:10}
+  .top h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.02em}
+  .top .jobno{color:var(--amber);font-weight:700}
+  .top .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  button{background:var(--panel2);color:var(--fg);border:1px solid var(--border);border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer}
+  button:hover{border-color:var(--amber)}
+  button.primary{background:var(--amber2);border-color:var(--amber);color:#1a1a1a;font-weight:700}
+  button.primary:hover{background:var(--amber)}
+  .wrap{max-width:1080px;margin:0 auto;padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .card.full{grid-column:1/3}
+  .card h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin:0 0 10px}
+  label{display:block;font-size:11px;color:var(--mute);margin:8px 0 3px;text-transform:uppercase;letter-spacing:.04em}
+  input[type=text],input[type=date],textarea{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);padding:8px;font-size:14px;font-family:inherit}
+  textarea{resize:vertical;line-height:1.5}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  /* status segmented */
+  .status-seg{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  .status-seg .seg{flex:1;min-width:120px;text-align:center;padding:10px 6px;border-radius:8px;border:1px solid var(--border);background:var(--panel2);cursor:pointer;font-weight:600;font-size:13px}
+  .status-seg .seg.active{color:#11131a}
+  .seg[data-s="Need Field Work"].active{background:var(--red);border-color:var(--red)}
+  .seg[data-s="In Drafting"].active{background:var(--yellow);border-color:var(--yellow)}
+  .seg[data-s="Ready for Signature"].active{background:var(--teal);border-color:var(--teal)}
+  .seg[data-s="Recorded"].active{background:var(--green);border-color:var(--green)}
+  .updated{font-size:11px;color:var(--mute);margin-top:8px}
+  /* evidence checklist */
+  .evid{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 12px}
+  .evid .chk{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:12px}
+  .evid .chk.have{border-color:var(--green);color:var(--green)}
+  .evid .chk .dot{width:9px;height:9px;border-radius:50%;background:var(--border)}
+  .evid .chk.have .dot{background:var(--green)}
+  /* paste zone */
+  .paste{border:2px dashed var(--border);border-radius:10px;padding:18px;text-align:center;color:var(--mute);cursor:pointer;margin-bottom:10px}
+  .paste:hover,.paste.drag{border-color:var(--amber);color:var(--fg)}
+  .paste b{color:var(--amber)}
+  .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+  .ph{background:var(--panel2);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative}
+  .ph img{width:100%;height:90px;object-fit:cover;display:block;cursor:pointer}
+  .ph select{width:100%;border:none;border-top:1px solid var(--border);background:#11131a;color:var(--fg);font-size:11px;padding:4px}
+  .ph .del{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;color:#fff;width:20px;height:20px;border-radius:4px;line-height:1;cursor:pointer;font-size:13px}
+  .hint{font-size:11px;color:var(--mute);margin-top:6px;line-height:1.5}
+  /* receptionist overlay */
+  #recept{display:none;position:fixed;inset:0;background:#0c0e13;z-index:50;overflow:auto;padding:30px}
+  #recept.show{display:block}
+  .rcard{max-width:620px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:26px 30px}
+  .rcard h2{font-size:13px;color:var(--mute);letter-spacing:.1em}
+  .rbig{font-size:30px;font-weight:800;margin:2px 0 16px}
+  .rstat{display:inline-block;padding:8px 16px;border-radius:24px;font-weight:800;font-size:16px;color:#11131a;margin-bottom:18px}
+  .rrow{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);font-size:16px}
+  .rrow .k{color:var(--mute)}
+  .rrow .v{font-weight:700}
+  .rchecks{margin-top:16px}
+  .rchecks .c{padding:6px 0;font-size:15px}
+  .rchecks .c.have{color:var(--green)}
+  .rchecks .c.miss{color:var(--mute)}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>PLEBYAN · JOB CARD <span class="jobno" id="t-jobno">24-45A</span></h1>
+  <div class="right">
+    <button onclick="openRecept()">👁 Receptionist view</button>
+    <button onclick="exportFolder()" title="Chrome: writes a real folder">📁 Export folder</button>
+    <button class="primary" onclick="exportZip()">⬇ Export .zip</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- IDENTITY -->
+  <div class="card">
+    <h2>Job</h2>
+    <div class="row2">
+      <div><label>Job #</label><input type="text" id="job_number" value="24-45A"></div>
+      <div><label>Client last name</label><input type="text" id="last_name" placeholder="Weyco"></div>
+    </div>
+    <div class="row2">
+      <div><label>Parcel #</label><input type="text" id="parcel" placeholder="WP•••• / tax parcel"></div>
+      <div><label>Site address</label><input type="text" id="address" placeholder="Address / location"></div>
+    </div>
+    <label>Section / Township / Range</label><input type="text" id="str" placeholder="S?? T??N R??W — Lewis Co.">
+  </div>
+
+  <!-- STATUS -->
+  <div class="card">
+    <h2>Status — what the receptionist sees</h2>
+    <div class="status-seg" id="statusSeg">
+      <div class="seg" data-s="Need Field Work">Need Field Work</div>
+      <div class="seg" data-s="In Drafting">In Drafting</div>
+      <div class="seg" data-s="Ready for Signature">Ready for Signature</div>
+      <div class="seg" data-s="Recorded">Recorded</div>
+    </div>
+    <div class="row2">
+      <div><label>Fieldwork date</label><input type="date" id="fieldwork_date"></div>
+      <div><label>Est. completion</label><input type="text" id="est_completion" placeholder="e.g. ~2 weeks / 7/15"></div>
+    </div>
+    <div class="updated" id="updated">not saved yet</div>
+  </div>
+
+  <!-- PHOTOS / EVIDENCE -->
+  <div class="card full">
+    <h2>Photos &amp; evidence</h2>
+    <div class="evid" id="evid"></div>
+    <div class="paste" id="pasteZone" tabindex="0">
+      <b>Paste a photo (Ctrl+V)</b> straight from Google Photos — or click to pick files.
+      <input type="file" id="fileIn" accept="image/*" multiple hidden>
+    </div>
+    <div class="photos" id="photos"></div>
+    <div class="hint">Habit to build: save the <b>deed</b>, a pic of the <b>nearest recorded survey</b>, plus corner/monument shots. Tag each so the export folder sorts itself.</div>
+  </div>
+
+  <!-- DRAFT WORDING -->
+  <div class="card full">
+    <h2>Draft wording (→ Carlson)</h2>
+    <textarea id="draft_text" rows="8" placeholder="ROS description / legal / BOB — the text you copy into Carlson."></textarea>
+    <label>Job notes / chat info</label>
+    <textarea id="notes" rows="4" placeholder="Anything discussed about the job — deed AFN, control held, who called, red-lines to avoid."></textarea>
+  </div>
+
+</div>
+
+<!-- RECEPTIONIST VIEW -->
+<div id="recept">
+  <div class="rcard">
+    <h2>BUTLER SURVEYING — JOB STATUS</h2>
+    <div class="rbig" id="r-name">—</div>
+    <div class="rstat" id="r-stat">—</div>
+    <div class="rrow"><span class="k">Job #</span><span class="v" id="r-job">—</span></div>
+    <div class="rrow"><span class="k">Parcel</span><span class="v" id="r-parcel">—</span></div>
+    <div class="rrow"><span class="k">Address</span><span class="v" id="r-addr">—</span></div>
+    <div class="rrow"><span class="k">Fieldwork date</span><span class="v" id="r-field">—</span></div>
+    <div class="rrow"><span class="k">Est. completion</span><span class="v" id="r-est">—</span></div>
+    <div class="rrow"><span class="k">Last updated</span><span class="v" id="r-upd">—</span></div>
+    <div class="rchecks" id="r-checks"></div>
+    <div style="margin-top:22px;text-align:center"><button onclick="closeRecept()">← Back to job card</button></div>
+  </div>
+</div>
+
+<script>
+const PHOTO_TYPES = ["Deed","Nearby Survey","Corner/Monument","Field Book","Misc"];
+const EVIDENCE = ["Deed","Nearby Survey","Corner/Monument"]; // the habit checklist
+const STATUSES = ["Need Field Work","In Drafting","Ready for Signature","Recorded"];
+const FIELDS = ["job_number","last_name","parcel","address","str","fieldwork_date","est_completion","draft_text","notes"];
+
+let job = {
+  job_number:"24-45A", last_name:"", parcel:"", address:"", str:"",
+  status:"Need Field Work", fieldwork_date:"", est_completion:"",
+  draft_text:"", notes:"", updated_at:"", photos:[] // {id,type,dataURL,ext}
+};
+const LS = () => "plebyan_job_" + (job.job_number||"untitled");
+
+function save(){
+  job.updated_at = new Date().toISOString();
+  try{ localStorage.setItem(LS(), JSON.stringify(job)); }catch(e){ /* quota */ }
+  document.getElementById("updated").textContent = "saved " + fmt(job.updated_at);
+}
+function load(){
+  // try load by the default job number first
+  const raw = localStorage.getItem("plebyan_job_24-45A");
+  if(raw){ try{ job = JSON.parse(raw); }catch(e){} }
+}
+function fmt(iso){ if(!iso) return "—"; const d=new Date(iso); return d.toLocaleString(); }
+
+function bindFields(){
+  FIELDS.forEach(f=>{
+    const el=document.getElementById(f); if(!el) return;
+    el.value = job[f]||"";
+    el.addEventListener("input",()=>{ job[f]=el.value; if(f==="job_number") document.getElementById("t-jobno").textContent=el.value; save(); });
+  });
+}
+function renderStatus(){
+  document.querySelectorAll("#statusSeg .seg").forEach(s=>{
+    s.classList.toggle("active", s.dataset.s===job.status);
+    s.onclick=()=>{ job.status=s.dataset.s; renderStatus(); save(); };
+  });
+}
+function renderEvid(){
+  const have = new Set(job.photos.map(p=>p.type));
+  document.getElementById("evid").innerHTML = EVIDENCE.map(e=>
+    `<div class="chk ${have.has(e)?'have':''}"><span class="dot"></span>${e}${have.has(e)?' ✓':''}</div>`
+  ).join("");
+}
+function renderPhotos(){
+  const c=document.getElementById("photos");
+  c.innerHTML = job.photos.map(p=>`
+    <div class="ph">
+      <button class="del" onclick="delPhoto('${p.id}')">×</button>
+      <img src="${p.dataURL}" onclick="window.open('${p.dataURL}')">
+      <select onchange="setType('${p.id}',this.value)">
+        ${PHOTO_TYPES.map(t=>`<option ${t===p.type?'selected':''}>${t}</option>`).join("")}
+      </select>
+    </div>`).join("");
+  renderEvid();
+}
+function addImage(dataURL, ext, guessType){
+  job.photos.push({id:"p"+Date.now()+Math.floor(Math.random()*999), type:guessType||"Misc", dataURL, ext:ext||"png"});
+  renderPhotos(); save();
+}
+function setType(id,t){ const p=job.photos.find(x=>x.id===id); if(p){p.type=t; renderEvid(); save();} }
+function delPhoto(id){ job.photos=job.photos.filter(x=>x.id!==id); renderPhotos(); save(); }
+
+function fileToDataURL(file){
+  return new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(file); });
+}
+async function handleFiles(files){
+  for(const f of files){ if(!f.type.startsWith("image/")) continue;
+    const url=await fileToDataURL(f); const ext=(f.name.split(".").pop()||"png").toLowerCase(); addImage(url,ext);
+  }
+}
+// paste
+document.addEventListener("paste",async e=>{
+  const items=e.clipboardData?.items||[];
+  for(const it of items){ if(it.type.startsWith("image/")){ const f=it.getAsFile(); if(f){ const url=await fileToDataURL(f); addImage(url, it.type.split("/")[1]||"png"); } } }
+});
+const pz=document.getElementById("pasteZone");
+pz.addEventListener("click",()=>document.getElementById("fileIn").click());
+document.getElementById("fileIn").addEventListener("change",e=>handleFiles(e.target.files));
+["dragover","dragenter"].forEach(ev=>pz.addEventListener(ev,e=>{e.preventDefault();pz.classList.add("drag");}));
+["dragleave","drop"].forEach(ev=>pz.addEventListener(ev,e=>{e.preventDefault();pz.classList.remove("drag");}));
+pz.addEventListener("drop",e=>handleFiles(e.dataTransfer.files));
+
+// ---- export helpers ----
+function dataURLtoBlob(d){ const [h,b]=d.split(","); const mime=h.match(/:(.*?);/)[1]; const bin=atob(b); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); return new Blob([u],{type:mime}); }
+function slug(s){ return (s||"").trim().replace(/[^\w.-]+/g,"_"); }
+function photoName(p,i){ return `photos/${slug(p.type)}/${slug(p.type)}_${String(i+1).padStart(2,"0")}.${p.ext||"png"}`; }
+function manifest(){ const {photos,...rest}=job; return {...rest, photos: photos.map((p,i)=>({type:p.type,file:photoName(p,i)}))}; }
+function jobCardHTML(){
+  const m=manifest();
+  const rows=[["Job #",m.job_number],["Client",m.last_name],["Parcel",m.parcel],["Address",m.address],["STR",m.str],["Status",m.status],["Fieldwork date",m.fieldwork_date],["Est. completion",m.est_completion],["Last updated",fmt(m.updated_at)]];
+  return `<!doctype html><meta charset="utf-8"><title>${m.job_number} — Job Card</title>
+  <body style="font-family:Arial;max-width:640px;margin:30px auto;color:#222">
+  <h1 style="margin:0">Butler Surveying — Job ${m.job_number}</h1>
+  <h2 style="color:#b88a2e">${m.status}</h2>
+  <table style="border-collapse:collapse;width:100%">${rows.map(r=>`<tr><td style="padding:6px 8px;color:#666;border-bottom:1px solid #eee">${r[0]}</td><td style="padding:6px 8px;border-bottom:1px solid #eee"><b>${r[1]||"—"}</b></td></tr>`).join("")}</table>
+  <h3>Draft wording</h3><pre style="white-space:pre-wrap;background:#f6f4ee;padding:12px;border-radius:6px">${(m.draft_text||"—").replace(/</g,"&lt;")}</pre>
+  <h3>Notes</h3><pre style="white-space:pre-wrap">${(m.notes||"—").replace(/</g,"&lt;")}</pre>
+  <h3>Photos</h3><ul>${m.photos.map(p=>`<li>${p.file}</li>`).join("")||"<li>none</li>"}</ul></body>`;
+}
+function buildFiles(){
+  const files=[["draft.txt", job.draft_text||""],["notes.txt", job.notes||""],
+    ["job.json", JSON.stringify(manifest(),null,2)],["job-card.html", jobCardHTML()]];
+  return files;
+}
+async function exportZip(){
+  save(); const zip=new JSZip(); const root=zip.folder(slug(job.job_number));
+  buildFiles().forEach(([n,c])=>root.file(n,c));
+  job.photos.forEach((p,i)=>root.file(photoName(p,i), dataURLtoBlob(p.dataURL)));
+  const blob=await zip.generateAsync({type:"blob"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=slug(job.job_number)+".zip"; a.click();
+}
+async function exportFolder(){
+  save();
+  if(!window.showDirectoryPicker){ alert("This browser can't write folders directly — using .zip instead."); return exportZip(); }
+  try{
+    const dir=await window.showDirectoryPicker({mode:"readwrite"});
+    const root=await dir.getDirectoryHandle(slug(job.job_number),{create:true});
+    for(const [n,c] of buildFiles()){ const fh=await root.getFileHandle(n,{create:true}); const w=await fh.createWritable(); await w.write(c); await w.close(); }
+    // photos into typed subfolders
+    for(let i=0;i<job.photos.length;i++){ const p=job.photos[i]; const path=photoName(p,i).split("/");
+      let cur=root; for(let k=0;k<path.length-1;k++) cur=await cur.getDirectoryHandle(path[k],{create:true});
+      const fh=await cur.getFileHandle(path[path.length-1],{create:true}); const w=await fh.createWritable(); await w.write(dataURLtoBlob(p.dataURL)); await w.close();
+    }
+    alert("Wrote folder “"+slug(job.job_number)+"”.");
+  }catch(e){ if(e.name!=="AbortError") alert("Folder export failed: "+e.message); }
+}
+
+// ---- receptionist ----
+function openRecept(){
+  const g=id=>document.getElementById(id);
+  g("r-name").textContent=job.last_name||"(no client name)";
+  const stat=g("r-stat"); stat.textContent=job.status;
+  const col={"Need Field Work":"#e05050","In Drafting":"#e0b040","Ready for Signature":"#00e5d1","Recorded":"#2ecc71"}[job.status]||"#888";
+  stat.style.background=col;
+  g("r-job").textContent=job.job_number||"—"; g("r-parcel").textContent=job.parcel||"—";
+  g("r-addr").textContent=job.address||"—"; g("r-field").textContent=job.fieldwork_date||"—";
+  g("r-est").textContent=job.est_completion||"—"; g("r-upd").textContent=fmt(job.updated_at);
+  const have=new Set(job.photos.map(p=>p.type));
+  g("r-checks").innerHTML=EVIDENCE.map(e=>`<div class="c ${have.has(e)?'have':'miss'}">${have.has(e)?'✓':'○'} ${e} on file</div>`).join("");
+  g("recept").classList.add("show");
+}
+function closeRecept(){ document.getElementById("recept").classList.remove("show"); }
+
+// boot
+load(); bindFields(); renderStatus(); renderPhotos();
+document.getElementById("t-jobno").textContent=job.job_number;
+document.getElementById("updated").textContent = job.updated_at?("saved "+fmt(job.updated_at)):"not saved yet";
+</script>
+</body>
+</html>

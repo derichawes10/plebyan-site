@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  EZ MAP — Crew Search Map Builder
+  By Piezo Labs · for Butler Surveying Inc.
+
+  Version: v1.0
+
+  Purpose (v1, narrow on purpose):
+    Build and beautify a SEARCH / CONTROL map a field crew carries into the
+    brush to FIND corners. Satellite base (paste-your-own, offline) + the
+    boundary/traverse from EZ Trav drawn on top, course distance/bearing
+    labels, and a repositionable callout box at each corner describing the
+    monument to find/set/search.
+
+  Heritage — this app reuses proven pieces from the two siblings:
+    · EZ TRAV  — the math authority. Geometry arrives via localStorage
+                 'ez_current_job' (points {calc,n,e} in local survey-feet,
+                 +N up / +E right) OR by pasting that JSON OR by PNEZD CSV.
+                 Bearing display (bearDisp / azToBearingInput) is ported
+                 verbatim so labels read identically to EZ Trav.
+    · EZ DOC   — the Field Sheet: Ctrl+V satellite paste, dim/scale/rotate,
+                 SVG canvas, halo labels (paint-order:stroke), FIND/SET red
+                 pins + CP squares + RP witness, corner priority rings 1–4,
+                 scale bar + north arrow.
+
+  Coordinate discipline (hard rules, do not break):
+    · Corners are IMMUTABLE here. EZ Map draws the geometry it is handed; a
+      corner point cannot be dragged or edited. Only its CALLOUT box moves
+      (with a leader back to the corner).
+    · EZ Map never measures geometry off the raster. The satellite is a
+      backdrop positioned UNDER the truth geometry; it is never the source
+      of a distance, bearing, or area.
+    · Course distance/bearing labels are the exact planar inverse of EZ
+      Trav's stated coordinates — presentation of authoritative values, not
+      an independent re-survey, no adjustment, no scaling off the photo.
+
+  Constraints honored: single .html, no build step, no server, no npm,
+    offline-first, no accounts/cloud/telemetry, permissive deps only (none
+    bundled — pure DOM/SVG).
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EZ MAP — Crew Search Map</title>
+<!-- Fonts load when online; strong system fallbacks keep it right offline. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Shared Piezo palette (matches EZ TRAV + EZ DOC) */
+  --bg:          #0a0d10;
+  --bg-grid:     #10151a;
+  --panel:       #11161b;
+  --panel-2:     #161c22;
+  --panel-3:     #1b232b;
+  --row-hover:   #1d262f;
+  --border:      #1f2830;
+  --border-hot:  #2a3845;
+  --fg:          #f4f2ed;
+  --fg-dim:      #b2bfcc;
+  --fg-mute:     #8896a6;
+  --teal:        #00e5d1;
+  --teal-dim:    #00b3a3;
+  --teal-soft:   rgba(0,229,209,0.10);
+  --amber:       #ffb547;
+  --amber-dim:   #b8822f;
+  --danger:      #ff5a4d;
+  --danger-soft: rgba(255,90,77,0.12);
+  --good:        #4ade80;
+  --radius-md:   6px;
+  --radius-lg:   10px;
+  --font-sans: 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ============================= TOP BAR ============================= */
+.topbar {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.brand-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+}
+.brand {
+  font-weight: 700; letter-spacing: 0.10em; font-size: 15px;
+  color: var(--fg); display: flex; align-items: baseline; gap: 8px;
+}
+.brand .ez { color: var(--teal); }
+.brand .v { font-family: var(--font-mono); font-size: 10px; color: var(--fg-mute); letter-spacing: 0; }
+.brand .tag { font-size: 10px; color: var(--fg-mute); letter-spacing: 0.04em; font-weight: 400; }
+.jobmeta {
+  margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--fg-dim);
+  display: flex; gap: 16px; align-items: center;
+}
+.jobmeta b { color: var(--teal); font-weight: 600; }
+.jobmeta .src { color: var(--fg-mute); }
+
+.toolrow {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+}
+.toolrow:last-child { border-bottom: none; }
+.tlabel {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--fg-mute); font-weight: 600; margin-right: 2px;
+}
+.tsep { width: 1px; height: 22px; background: var(--border); margin: 0 6px; }
+
+button, select, input[type=text] {
+  font-family: var(--font-sans);
+}
+.btn {
+  background: var(--panel-2); color: var(--fg-dim);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 6px 11px; font-size: 12px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.btn:hover { background: var(--panel-3); border-color: var(--border-hot); color: var(--fg); }
+.btn.primary { background: var(--teal-soft); color: var(--teal); border-color: var(--teal-dim); }
+.btn.primary:hover { background: rgba(0,229,209,0.18); }
+.btn.active { background: var(--teal); color: var(--bg); border-color: var(--teal); font-weight: 600; }
+.btn.danger { color: var(--danger); border-color: rgba(255,90,77,0.3); }
+.btn.danger:hover { background: var(--danger-soft); }
+.btn.sm { padding: 4px 8px; font-size: 11px; }
+
+.toggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 5px 9px; font-size: 11px;
+  color: var(--fg-dim); cursor: pointer; user-select: none;
+}
+.toggle input { accent-color: var(--teal); cursor: pointer; }
+.toggle.on { color: var(--fg); border-color: var(--border-hot); }
+
+.slider-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.slider-wrap input[type=range] { width: 92px; accent-color: var(--teal); cursor: pointer; }
+.readout { font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute); width: 38px; text-align: right; }
+
+/* ============================= MAIN ============================= */
+.main { flex: 1 1 auto; display: flex; min-height: 0; }
+
+.stage-wrap { flex: 1 1 auto; position: relative; min-width: 0; background: var(--bg); overflow: hidden; }
+#sheet { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
+#sheet.panning { cursor: grabbing; }
+#sheet.aligning { cursor: move; }
+
+.stage-empty {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; pointer-events: none;
+  color: var(--fg-mute); text-align: center; padding: 40px;
+}
+.stage-empty .big { font-size: 15px; color: var(--fg-dim); font-weight: 600; letter-spacing: 0.02em; }
+.stage-empty .kbd {
+  display: inline-block; font-family: var(--font-mono); font-size: 11px;
+  background: var(--panel-2); border: 1px solid var(--border-hot);
+  border-radius: 4px; padding: 1px 6px; color: var(--teal);
+}
+
+/* screen-fixed overlays */
+.overlay { position: absolute; pointer-events: none; z-index: 5; }
+.north-arrow { top: 14px; right: 16px; }
+.north-arrow svg { width: 40px; height: 48px; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8)); }
+.scale-bar {
+  bottom: 16px; left: 16px;
+  font-family: var(--font-mono); font-size: 11px; color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9); display: flex; flex-direction: column; gap: 3px;
+}
+.scale-bar .bar { height: 7px; background: linear-gradient(90deg,#fff 0 50%, #000 50% 100%);
+  border: 1px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.6); }
+.zoom-pad { bottom: 16px; right: 16px; display: flex; flex-direction: column; gap: 4px; pointer-events: auto; }
+.zoom-pad .btn { width: 34px; height: 30px; justify-content: center; padding: 0; font-size: 16px; }
+
+.viewscale {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 10px; color: var(--fg-mute);
+  background: rgba(10,13,16,0.6); padding: 2px 8px; border-radius: 4px; z-index: 5; pointer-events: none;
+}
+
+/* ============================= SIDE PANEL ============================= */
+.side {
+  flex: 0 0 322px; background: var(--panel); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; min-height: 0;
+}
+.side-head {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.side-head .title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-dim); }
+.side-head .count { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute); }
+.corner-list { flex: 1 1 auto; overflow-y: auto; padding: 8px; }
+.corner-list::-webkit-scrollbar { width: 9px; }
+.corner-list::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 5px; }
+
+.cc {
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-left: 3px solid var(--fg-mute); border-radius: var(--radius-md);
+  margin-bottom: 7px; overflow: hidden;
+}
+.cc.sel { border-color: var(--teal-dim); border-left-color: var(--teal); box-shadow: 0 0 0 1px var(--teal-dim); }
+.cc-head {
+  display: flex; align-items: center; gap: 8px; padding: 7px 9px; cursor: pointer;
+}
+.cc-pt {
+  font-family: var(--font-mono); font-weight: 700; font-size: 13px; color: var(--fg);
+  background: var(--panel-3); border-radius: 4px; padding: 2px 7px; min-width: 30px; text-align: center;
+}
+.cc-status {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
+  padding: 2px 6px; border-radius: 3px; text-transform: uppercase;
+}
+.st-FOUND  { background: rgba(74,222,128,0.16); color: var(--good); }
+.st-SET    { background: rgba(255,181,71,0.16); color: var(--amber); }
+.st-SEARCH { background: var(--danger-soft); color: var(--danger); }
+.cc-desc { flex: 1 1 auto; font-size: 11px; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-ring { font-family: var(--font-mono); font-size: 9px; color: var(--fg-mute); }
+.cc-body { padding: 4px 10px 10px; border-top: 1px solid var(--border); display: none; }
+.cc.open .cc-body { display: block; }
+.fld { margin-top: 8px; }
+.fld label { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--fg-mute); margin-bottom: 3px; }
+.fld input[type=text], .fld textarea, .fld select {
+  width: 100%; background: var(--panel); border: 1px solid var(--border); color: var(--fg);
+  border-radius: 4px; padding: 5px 7px; font-size: 12px; font-family: var(--font-sans);
+}
+.fld textarea { resize: vertical; min-height: 38px; font-size: 12px; }
+.fld input:focus, .fld textarea:focus, .fld select:focus { outline: none; border-color: var(--teal-dim); }
+.seg { display: flex; gap: 4px; }
+.seg button {
+  flex: 1; background: var(--panel); border: 1px solid var(--border); color: var(--fg-mute);
+  border-radius: 4px; padding: 5px 0; font-size: 11px; cursor: pointer; font-weight: 600;
+}
+.seg button.on { background: var(--panel-3); color: var(--fg); border-color: var(--border-hot); }
+.seg.status button.on[data-v=FOUND]  { color: var(--good);   border-color: var(--good); }
+.seg.status button.on[data-v=SET]    { color: var(--amber);  border-color: var(--amber); }
+.seg.status button.on[data-v=SEARCH] { color: var(--danger); border-color: var(--danger); }
+.cc-coords { font-family: var(--font-mono); font-size: 10px; color: var(--fg-mute); margin-top: 8px; }
+.row2 { display: flex; gap: 8px; }
+.row2 > * { flex: 1; }
+.side-foot { padding: 9px 12px; border-top: 1px solid var(--border); font-size: 10px; color: var(--fg-mute); line-height: 1.5; }
+
+/* ============================= MODALS ============================= */
+.modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 999;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-bg.show { display: flex; }
+.modal {
+  background: var(--panel); border: 1px solid var(--border-hot); border-radius: var(--radius-lg);
+  width: 560px; max-width: 100%; max-height: 86vh; overflow-y: auto; box-shadow: 0 18px 60px rgba(0,0,0,0.6);
+}
+.modal-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; }
+.modal-head .t { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; }
+.modal-head .x { margin-left: auto; cursor: pointer; color: var(--fg-mute); font-size: 18px; line-height: 1; }
+.modal-head .x:hover { color: var(--fg); }
+.modal-body { padding: 16px 18px; }
+.modal-body p { color: var(--fg-dim); font-size: 12.5px; line-height: 1.55; margin-bottom: 10px; }
+.modal-body textarea {
+  width: 100%; min-height: 180px; background: var(--bg); border: 1px solid var(--border);
+  color: var(--fg); border-radius: 6px; padding: 10px; font-family: var(--font-mono); font-size: 12px; resize: vertical;
+}
+.modal-foot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+code.k { font-family: var(--font-mono); background: var(--panel-3); padding: 1px 5px; border-radius: 3px; color: var(--teal); font-size: 11px; }
+
+/* ============================= STATUS ============================= */
+.statusbar {
+  flex: 0 0 auto; background: var(--panel); border-top: 1px solid var(--border);
+  padding: 5px 14px; font-family: var(--font-mono); font-size: 11px; color: var(--fg-mute);
+  display: flex; align-items: center; gap: 10px;
+}
+.statusbar .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-mute); }
+.statusbar.ok .dot { background: var(--good); }
+.statusbar.warn .dot { background: var(--amber); }
+
+/* ============================= PRINT ============================= */
+@media print {
+  .topbar, .side, .zoom-pad, .statusbar, .viewscale { display: none !important; }
+  .app, .main, .stage-wrap { height: auto; }
+  body { overflow: visible; background: #fff; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ==================== TOP BAR ==================== -->
+  <div class="topbar">
+    <div class="brand-row">
+      <div class="brand">
+        <span><span class="ez">EZ</span> MAP</span>
+        <span class="v">v1.0</span>
+        <span class="tag">crew search map · Piezo Labs</span>
+      </div>
+      <div class="jobmeta" id="jobmeta">
+        <span class="src">no geometry loaded</span>
+      </div>
+    </div>
+
+    <!-- Row 1: DATA -->
+    <div class="toolrow">
+      <span class="tlabel">Geometry</span>
+      <button class="btn primary" id="btnFromTrav" title="Read the active traverse EZ TRAV last published to localStorage (ez_current_job)">📥 From EZ Trav</button>
+      <button class="btn" id="btnPasteJson" title="Paste the EZ Trav job JSON (ez_current_job) directly — the file:// fallback when localStorage doesn't bridge between apps">⇪ Paste payload</button>
+      <button class="btn" id="btnImportCsv" title="Import a PNEZD coordinate file (P,N,E,Z,Desc) — the format EZ Trav / Carlson export">⊞ PNEZD CSV</button>
+      <button class="btn" id="btnDemo" title="Load a sample parcel so you can see the sheet work">◇ Sample</button>
+      <span class="tsep"></span>
+      <span class="tlabel">Satellite</span>
+      <button class="btn" id="btnPasteImg" title="Paste a satellite screen clip (Win+Shift+S then Ctrl+V anywhere on the sheet)">🛰 Paste clip</button>
+      <button class="btn sm" id="btnAlign" title="Align mode — drag the photo to sit under the geometry (geometry never moves)">⤧ Align</button>
+      <span class="slider-wrap"><span class="tlabel">Dim</span>
+        <input type="range" id="imgOpacity" min="10" max="100" value="100"><span class="readout" id="imgOpacityOut">100%</span></span>
+      <span class="slider-wrap"><span class="tlabel">Rot</span>
+        <input type="range" id="imgRot" min="-180" max="180" value="0"><span class="readout" id="imgRotOut">0°</span></span>
+      <button class="btn sm" id="btnImgReset" title="Re-fit photo under the parcel">⟲</button>
+    </div>
+
+    <!-- Row 2: LABELS / RINGS / OUTPUT -->
+    <div class="toolrow">
+      <span class="tlabel">Labels</span>
+      <label class="toggle on" id="tgDist"><input type="checkbox" checked> Distance</label>
+      <label class="toggle on" id="tgBear"><input type="checkbox" checked> Bearing</label>
+      <label class="toggle on" id="tgPt"><input type="checkbox" checked> Pt #</label>
+      <label class="toggle on" id="tgHalo"><input type="checkbox" checked> Halo box</label>
+      <span class="tsep"></span>
+      <span class="tlabel">Show rings</span>
+      <label class="toggle on" id="tgR1" title="Ring 1 — subject-parcel corners (always shown)"><input type="checkbox" checked disabled> 1·subject</label>
+      <label class="toggle on" id="tgR2" title="Ring 2 — road CL + adjacent corners within a tape-pull"><input type="checkbox" checked> 2·adjacent</label>
+      <label class="toggle on" id="tgR3" title="Ring 3 — section / quarter / PLSS monuments"><input type="checkbox" checked> 3·PLSS</label>
+      <label class="toggle" id="tgR4" title="Ring 4 — other imported monuments (hidden by default)"><input type="checkbox"> 4·other</label>
+      <span class="tsep"></span>
+      <button class="btn" id="btnFit" title="Zoom to fit all geometry (F)">⤢ Fit</button>
+      <button class="btn" id="btnPng" title="Save the sheet as a PNG image">⬇ PNG</button>
+      <button class="btn primary" id="btnPrint" title="Print / Save as PDF — pick your printer or 'Save as PDF', landscape">🖨 Print</button>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN ==================== -->
+  <div class="main">
+    <div class="stage-wrap" id="stageWrap">
+      <svg id="sheet" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- soft drop for callout boxes -->
+          <filter id="ccShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.55"/>
+          </filter>
+        </defs>
+        <g id="layImg"></g>
+        <g id="layFill"></g>
+        <g id="layLines"></g>
+        <g id="layLabels"></g>
+        <g id="layLeaders"></g>
+        <g id="layMarkers"></g>
+        <g id="layCallouts"></g>
+      </svg>
+
+      <div class="stage-empty" id="stageEmpty">
+        <div class="big">No geometry yet</div>
+        <div>Pull the traverse from <b style="color:var(--fg-dim)">EZ Trav</b>, paste its payload, or load a <b style="color:var(--fg-dim)">PNEZD CSV</b>.</div>
+        <div>Then press <span class="kbd">Ctrl</span>+<span class="kbd">V</span> to drop a satellite clip behind it.</div>
+      </div>
+
+      <!-- screen-fixed overlays -->
+      <div class="overlay north-arrow" id="northArrow">
+        <svg viewBox="0 0 40 48">
+          <polygon points="20,2 28,30 20,24 12,30" fill="#fff" stroke="#000" stroke-width="1"/>
+          <text x="20" y="44" text-anchor="middle" font-size="13" font-family="sans-serif" font-weight="700" fill="#fff" stroke="#000" stroke-width="0.7" paint-order="stroke">N</text>
+        </svg>
+      </div>
+      <div class="overlay scale-bar" id="scaleBar">
+        <div class="bar" id="scaleBarBar" style="width:100px"></div>
+        <span id="scaleBarLbl">— ft</span>
+      </div>
+      <div class="viewscale" id="viewScale">—</div>
+      <div class="overlay zoom-pad">
+        <button class="btn" id="btnZin">+</button>
+        <button class="btn" id="btnZout">−</button>
+      </div>
+    </div>
+
+    <!-- ==================== SIDE PANEL ==================== -->
+    <div class="side">
+      <div class="side-head">
+        <span class="title">Corners</span>
+        <span class="count" id="cornerCount">0</span>
+      </div>
+      <div class="corner-list" id="cornerList"></div>
+      <div class="side-foot">
+        Click a card to edit its callout. Status drives the pin: <b style="color:var(--good)">FOUND</b> solid ·
+        <b style="color:var(--amber)">SET</b> hollow · <b style="color:var(--danger)">SEARCH</b> dashed ring.
+        Drag a callout box on the sheet to move it — the corner stays put.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== STATUS ==================== -->
+  <div class="statusbar" id="statusbar">
+    <span class="dot"></span><span id="statusText">Ready. Load geometry to begin.</span>
+  </div>
+</div>
+
+<!-- ==================== PASTE-JSON MODAL ==================== -->
+<div class="modal-bg" id="jsonModal">
+  <div class="modal">
+    <div class="modal-head"><span class="t">Paste EZ Trav payload</span><span class="x" data-close="jsonModal">✕</span></div>
+    <div class="modal-body">
+      <p>In EZ Trav, the active traverse is published to <code class="k">localStorage.ez_current_job</code> on every recompute.
+      When EZ Trav and EZ Map run as separate double-clicked files, browsers may not share <code class="k">file://</code> storage —
+      so the reliable path is to copy that JSON and paste it here.</p>
+      <p style="color:var(--fg-mute)">Shape: <code class="k">{ traverse: { points: [{calc,n,e}], closed }, job_number, client_name, … }</code>.
+      A bare <code class="k">[{P,N,E,D}]</code> array also works.</p>
+      <textarea id="jsonInput" placeholder='{"traverse":{"label":"MAIN","points":[{"calc":1,"n":10000,"e":10000}, ...],"closed":true}, "job_number":"...", "client_name":"..."}'></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close="jsonModal">Cancel</button>
+      <button class="btn primary" id="jsonLoad">Load</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== IMPORT CSV MODAL ==================== -->
+<div class="modal-bg" id="csvModal">
+  <div class="modal">
+    <div class="modal-head"><span class="t">Import PNEZD CSV</span><span class="x" data-close="csvModal">✕</span></div>
+    <div class="modal-body">
+      <p>One point per line, comma- or space-delimited. Column order
+      <code class="k">P, N, E, Z, Desc</code> (the Carlson / EZ Trav default).
+      Z is ignored for the search map. A header row is auto-skipped.</p>
+      <p style="color:var(--fg-mute)">Desc codes <code class="k">PLSS</code>/<code class="k">SC</code>/<code class="k">1/4</code> tag a point to ring 3;
+      <code class="k">CP</code>/<code class="k">HUB</code> → CP square; <code class="k">RP</code>/<code class="k">WIT</code> → witness. Everything else → ring-1 FIND/SET.</p>
+      <textarea id="csvInput" placeholder="1,10000.00,10000.00,0,5/8 REBAR LS 35153&#10;2,10000.00,10200.00,0,SET 1/2 REBAR&#10;3,10150.00,10200.00,0,IP NOT FOUND AFN 1234567&#10;4,10150.00,10000.00,0,5/8 REBAR LS 35153&#10;5,10075.00,9700.00,0,FD 3IN BRASS CAP 1/4 COR PLSS"></textarea>
+      <div style="margin-top:10px;" class="row2">
+        <label class="toggle on" id="csvClosed"><input type="checkbox" checked> Treat as closed parcel</label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close="csvModal">Cancel</button>
+      <button class="btn primary" id="csvLoad">Import</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   EZ MAP v1.0  —  all logic. No external runtime deps.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   Bearing math — ported VERBATIM from EZ TRAV so labels read identically.
+   (parseBearingParts / azToBearingInput / bearDisp)
+   --------------------------------------------------------------------- */
+function parseBearingParts(val) {
+  const s = (val == null ? '' : val.toString()).trim();
+  if (!s) return null;
+  const C = s.toUpperCase();
+  if (C === 'N') return { q:1, deg:0,  min:0, sec:0, card:'N' };
+  if (C === 'E') return { q:1, deg:90, min:0, sec:0, card:'E' };
+  if (C === 'S') return { q:3, deg:0,  min:0, sec:0, card:'S' };
+  if (C === 'W') return { q:3, deg:90, min:0, sec:0, card:'W' };
+  const m = s.match(/^([1-4])(\d{1,2})(?:\.(\d{2})(\d{2}(?:\d+)?)?)?$/);
+  if (!m) return null;
+  const q = parseInt(m[1]); const deg = parseInt(m[2]);
+  const min = m[3] != null ? parseInt(m[3]) : 0;
+  const secStr = m[4] || ''; let sec = 0;
+  if (secStr.length >= 2) {
+    const secWhole = parseInt(secStr.slice(0,2));
+    const secFrac = secStr.length > 2 ? parseFloat('0.' + secStr.slice(2)) : 0;
+    sec = secWhole + secFrac;
+  }
+  if (deg > 90 || (deg === 90 && (min > 0 || sec > 0)) || min >= 60 || sec >= 60) return null;
+  if (deg === 0 && min === 0 && sec === 0) return { q, deg, min, sec, card:(q===1||q===4)?'N':'S' };
+  if (deg === 90 && min === 0 && sec === 0) return { q, deg, min, sec, card:(q===1||q===2)?'E':'W' };
+  return { q, deg, min, sec };
+}
+function azToBearingInput(az) {
+  az = ((az % 360) + 360) % 360; const EPS = 1e-6;
+  if (Math.abs(az) < EPS || Math.abs(az-360) < EPS) return 'N';
+  if (Math.abs(az-90) < EPS) return 'E';
+  if (Math.abs(az-180) < EPS) return 'S';
+  if (Math.abs(az-270) < EPS) return 'W';
+  let q, dd;
+  if (az < 90) { q=1; dd=az; } else if (az < 180) { q=2; dd=180-az; }
+  else if (az < 270) { q=3; dd=az-180; } else { q=4; dd=360-az; }
+  const deg = Math.floor(dd); const minF = (dd-deg)*60; const min = Math.floor(minF);
+  let sec = Math.round((minF-min)*60), fdeg=deg, fmin=min, fsec=sec;
+  if (fsec >= 60) { fsec-=60; fmin+=1; } if (fmin >= 60) { fmin-=60; fdeg+=1; }
+  if (fdeg >= 90) { fdeg=89; fmin=59; fsec=59; }
+  return `${q}${fdeg}.${String(fmin).padStart(2,'0')}${String(fsec).padStart(2,'0')}`;
+}
+function bearDisp(val) {
+  const p = parseBearingParts(val); if (!p) return '';
+  if (p.card) return p.card;
+  const d = [['',''],['N','E'],['S','E'],['S','W'],['N','W']][p.q];
+  const secStr = p.sec === Math.floor(p.sec) ? String(Math.floor(p.sec)).padStart(2,'0') : p.sec.toFixed(1).padStart(4,'0');
+  return `${d[0]}${p.deg}°${String(p.min).padStart(2,'0')}'${secStr}"${d[1]}`;
+}
+// Planar inverse of EZ Trav's stated coordinates → {dist, az, bearingStr, distStr}.
+// This presents authoritative values; it is not an independent survey.
+function inverse(n0, e0, n1, e1) {
+  const dN = n1 - n0, dE = e1 - e0;
+  const dist = Math.hypot(dN, dE);
+  const az = ((Math.atan2(dE, dN) * 180 / Math.PI) % 360 + 360) % 360;
+  return { dist, az, bearingStr: bearDisp(azToBearingInput(az)), distStr: dist.toFixed(2) + "'" };
+}
+
+/* ---------------------------------------------------------------------
+   STATE
+   --------------------------------------------------------------------- */
+const MARK = { findset:'#ff5a4d', cp:'#0e1318', rp:'#9d8aff' };
+const STATUS_COLOR = { FOUND:'#4ade80', SET:'#ffb547', SEARCH:'#ff5a4d' };
+const NS = 'http://www.w3.org/2000/svg';
+
+const S = {
+  meta: { job:'', client:'', county:'', source:'' },
+  corners: [],          // see makeCorner()
+  courses: [],          // {fromId,toId,...inverse}
+  closed: false,
+  nextId: 1,
+  view: { scale: 1, panX: 0, panY: 0, fitScale: 1, ctrN: 0, ctrE: 0 },
+  img: null,            // { href, natW, natH, wx, wy, wWorld, rot, opacity }
+  align: false,         // align-mode (drag photo) on
+  labels: { dist:true, bear:true, pt:true, halo:true },
+  rings: { 1:true, 2:true, 3:true, 4:true },
+  selId: null,
+  drag: null,
+};
+
+function makeCorner(o) {
+  return Object.assign({
+    id: S.nextId++, pt:'', n:0, e:0,
+    ring: 1, marker:'findset', status:'SEARCH',
+    monument:'', afn:'', dig:'',
+    showCallout: true, co:{ dx:0, dy:0 }, coInit:false,
+    rpTargetId: null,
+  }, o || {});
+}
+
+/* ---------------------------------------------------------------------
+   DOM refs
+   --------------------------------------------------------------------- */
+const svg = document.getElementById('sheet');
+const layImg = document.getElementById('layImg');
+const layFill = document.getElementById('layFill');
+const layLines = document.getElementById('layLines');
+const layLabels = document.getElementById('layLabels');
+const layLeaders = document.getElementById('layLeaders');
+const layMarkers = document.getElementById('layMarkers');
+const layCallouts = document.getElementById('layCallouts');
+const stageWrap = document.getElementById('stageWrap');
+const stageEmpty = document.getElementById('stageEmpty');
+
+function el(tag, attrs, txt) {
+  const e = document.createElementNS(NS, tag);
+  if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (txt != null) e.textContent = txt;
+  return e;
+}
+function setStatus(msg, kind) {
+  document.getElementById('statusText').textContent = msg;
+  const bar = document.getElementById('statusbar');
+  bar.classList.remove('ok','warn');
+  if (kind) bar.classList.add(kind);
+}
+
+/* ---------------------------------------------------------------------
+   VIEW TRANSFORM  (world survey-feet → screen px; Y flipped, N up)
+   Mirrors EZ TRAV's tx/ty fit-scale-pan model.
+   --------------------------------------------------------------------- */
+function stageSize() { const r = stageWrap.getBoundingClientRect(); return { w:r.width, h:r.height }; }
+function computeFit() {
+  if (!S.corners.length) return;
+  let minN=Infinity,maxN=-Infinity,minE=Infinity,maxE=-Infinity;
+  for (const c of S.corners) { if(c.n<minN)minN=c.n; if(c.n>maxN)maxN=c.n; if(c.e<minE)minE=c.e; if(c.e>maxE)maxE=c.e; }
+  const dataN = (maxN-minN)||1, dataE = (maxE-minE)||1;
+  const { w, h } = stageSize(); const pad = 90;
+  S.view.fitScale = Math.min((h-pad*2)/dataN, (w-pad*2)/dataE);
+  S.view.ctrN = (minN+maxN)/2; S.view.ctrE = (minE+maxE)/2;
+}
+function fitView() { computeFit(); S.view.scale = 1; S.view.panX = 0; S.view.panY = 0; render(); }
+function sc() { return S.view.fitScale * S.view.scale; }                 // px per foot
+function tx(e) { const { w } = stageSize(); return w/2 + (e - S.view.ctrE)*sc() + S.view.panX; }
+function ty(n) { const { h } = stageSize(); return h/2 - (n - S.view.ctrN)*sc() + S.view.panY; }
+function screenToWorld(px, py) {
+  const { w, h } = stageSize();
+  return { e: (px - w/2 - S.view.panX)/sc() + S.view.ctrE,
+           n: -(py - h/2 - S.view.panY)/sc() + S.view.ctrN };
+}
+
+/* ---------------------------------------------------------------------
+   COURSE COMPUTATION  (consecutive corners on rings 1+2 polygon only)
+   The "boundary" = ring-1 (subject) corners in their loaded order,
+   plus the closing course when closed. Ring 3/4 monuments are isolated
+   control, not courses.
+   --------------------------------------------------------------------- */
+function recomputeCourses() {
+  S.courses = [];
+  const loop = S.corners.filter(c => c.ring === 1);
+  for (let i=0; i<loop.length-1; i++) addCourse(loop[i], loop[i+1]);
+  if (S.closed && loop.length > 2) addCourse(loop[loop.length-1], loop[0]);
+  function addCourse(a, b) {
+    const inv = inverse(a.n, a.e, b.n, b.e);
+    S.courses.push(Object.assign({ fromId:a.id, toId:b.id }, inv));
+  }
+}
+
+/* ---------------------------------------------------------------------
+   RENDER
+   --------------------------------------------------------------------- */
+function clear(g){ while(g.firstChild) g.removeChild(g.firstChild); }
+
+function render() {
+  if (!S.corners.length) { stageEmpty.style.display='flex'; [layFill,layLines,layLabels,layLeaders,layMarkers,layCallouts].forEach(clear); }
+  else stageEmpty.style.display='none';
+
+  const { w, h } = stageSize();
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+  renderImage();
+  renderFillAndLines();
+  renderCourseLabels();
+  renderMarkersAndCallouts();   // markers + leaders + callouts together (need corner screen pos)
+  refreshScaleBar();
+  refreshViewScale();
+}
+
+/* ---- satellite backdrop (world-anchored so it tracks pan/zoom) ---- */
+function renderImage() {
+  clear(layImg);
+  if (!S.img) return;
+  const i = S.img;
+  const scx = tx(i.wx), scy = ty(i.wy);     // image center in screen
+  const sw = i.wWorld * sc();
+  const sh = sw * (i.natH / i.natW);
+  const im = el('image', {
+    href: i.href, 'xlink:href': i.href,
+    x: scx - sw/2, y: scy - sh/2, width: sw, height: sh,
+    opacity: i.opacity, preserveAspectRatio:'none',
+    transform: `rotate(${i.rot} ${scx} ${scy})`
+  });
+  im.setAttribute('class','sat-img');
+  layImg.appendChild(im);
+}
+
+/* ---- closed-area fill + boundary lines ---- */
+function renderFillAndLines() {
+  clear(layFill); clear(layLines);
+  if (S.courses.length === 0) return;
+  const loop = S.corners.filter(c => c.ring === 1);
+
+  if (S.closed && loop.length > 2) {
+    const pts = loop.map(c => `${tx(c.e)},${ty(c.n)}`).join(' ');
+    layFill.appendChild(el('polygon', { points:pts, fill:'rgba(0,229,209,0.08)', stroke:'none' }));
+  }
+  // halo under-stroke (dark) then bright course on top — survives over photo
+  for (const cs of S.courses) {
+    const a = byId(cs.fromId), b = byId(cs.toId);
+    const x1=tx(a.e),y1=ty(a.n),x2=tx(b.e),y2=ty(b.n);
+    layLines.appendChild(el('line', { x1,y1,x2,y2, stroke:'#000', 'stroke-width':5.5, 'stroke-opacity':0.55, 'stroke-linecap':'round' }));
+    layLines.appendChild(el('line', { x1,y1,x2,y2, stroke:'#00e5d1', 'stroke-width':2.4, 'stroke-linecap':'round' }));
+  }
+}
+
+/* ---- course distance / bearing labels along each line ---- */
+function renderCourseLabels() {
+  clear(layLabels);
+  if (!(S.labels.dist || S.labels.bear)) return;
+  for (const cs of S.courses) {
+    const a = byId(cs.fromId), b = byId(cs.toId);
+    const x1=tx(a.e),y1=ty(a.n),x2=tx(b.e),y2=ty(b.n);
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    // screen angle of the course; flip so text is never upside-down.
+    // (EZ DOC's convention is rotation = -(90 - azimuth); computing the
+    //  screen angle straight from the projected endpoints is equivalent
+    //  here because the Y-flip is already baked into ty().)
+    let ang = Math.atan2(y2-y1, x2-x1) * 180/Math.PI;
+    if (ang > 90) ang -= 180; else if (ang < -90) ang += 180;
+    const off = 11;   // sit the label just above the line, not on it
+
+    const parts = [];
+    if (S.labels.bear && cs.bearingStr) parts.push(cs.bearingStr);
+    if (S.labels.dist) parts.push(cs.distStr);
+    const txt = parts.join('   ');
+    if (!txt) continue;
+
+    const g = el('g', { transform:`translate(${mx} ${my}) rotate(${ang}) translate(0 ${-off})` });
+    if (S.labels.halo) {
+      const padX=6, padY=3, charW=6.6, fs=12.5;
+      const tw = txt.length*charW + padX*2;
+      g.appendChild(el('rect', { x:-tw/2, y:-fs/2-padY, width:tw, height:fs+padY*2, rx:3,
+        fill:'rgba(10,13,16,0.74)', stroke:'rgba(0,229,209,0.30)', 'stroke-width':0.7 }));
+    }
+    const t = el('text', { x:0, y:0, 'text-anchor':'middle', 'dominant-baseline':'central',
+      'font-family':"'JetBrains Mono', monospace", 'font-size':12.5, 'font-weight':600,
+      fill:'#f4f2ed', stroke:'#000', 'stroke-width':S.labels.halo?0:2.6, 'paint-order':'stroke' }, txt);
+    g.appendChild(t);
+    layLabels.appendChild(g);
+  }
+}
+
+/* ---- markers + leaders + callouts ---- */
+function ringVisible(r){ return r===1 ? true : !!S.rings[r]; }
+// emphasis-by-ring: radius + opacity
+const RING_R = {1:14, 2:11, 3:12, 4:7};
+const RING_OP = {1:1, 2:1, 3:1, 4:0.45};
+
+function renderMarkersAndCallouts() {
+  clear(layMarkers); clear(layLeaders); clear(layCallouts);
+  if (!S.corners.length) return;
+
+  for (const c of S.corners) {
+    if (!ringVisible(c.ring)) continue;
+    const X = tx(c.e), Y = ty(c.n);
+
+    // RP → MON directional leader (witness points at the monument it references)
+    if (c.marker === 'rp' && c.rpTargetId != null) {
+      const tgt = byId(c.rpTargetId);
+      if (tgt && ringVisible(tgt.ring)) {
+        const tX=tx(tgt.e), tY=ty(tgt.n);
+        layLeaders.appendChild(el('line', { x1:X,y1:Y,x2:tX,y2:tY,
+          stroke:MARK.rp, 'stroke-width':1.6, 'stroke-dasharray':'5 4', 'stroke-opacity':0.85 }));
+      }
+    }
+
+    drawMarker(c, X, Y);
+
+    // callout box + leader
+    if (c.showCallout && hasCalloutText(c)) drawCallout(c, X, Y);
+  }
+}
+
+function drawMarker(c, X, Y) {
+  const g = el('g', { transform:`translate(${X} ${Y})`, class:'mk', 'data-id':c.id, opacity:RING_OP[c.ring] });
+  const r = RING_R[c.ring];
+  const sel = c.id === S.selId;
+
+  if (c.marker === 'findset') {
+    // SEARCH gets a dashed "look here" ring; selection echoes it in teal
+    if (c.status === 'SEARCH') {
+      g.appendChild(el('circle', { r:r+7, fill:'none', stroke:'#fff', 'stroke-width':2,
+        'stroke-dasharray':'5 4', 'stroke-opacity':0.9 }));
+    }
+    if (sel) g.appendChild(el('circle', { r:r+10, fill:'none', stroke:'#00e5d1', 'stroke-width':1.5, 'stroke-dasharray':'3 3' }));
+    // FOUND = solid red ; SET = hollow (not placed yet)
+    const fill = (c.status === 'SET') ? '#11161b' : MARK.findset;
+    g.appendChild(el('circle', { r, fill, stroke:'#fff', 'stroke-width':2.4,
+      ...(c.status==='SET' ? {} : {}) }));
+    if (c.status === 'SET') g.appendChild(el('circle', { r, fill:'none', stroke:MARK.findset, 'stroke-width':2.4 }));
+    if (S.labels.pt) g.appendChild(mkLabel(c.pt || '', 0, 0, Math.max(11, r*0.85), (c.status==='SET')?'#ff5a4d':'#fff'));
+  } else if (c.marker === 'cp') {
+    const s = r*1.7;
+    if (sel) g.appendChild(el('rect', { x:-s/2-7, y:-s/2-7, width:s+14, height:s+14, rx:3, fill:'none', stroke:'#00e5d1', 'stroke-width':1.5, 'stroke-dasharray':'3 3' }));
+    g.appendChild(el('rect', { x:-s/2, y:-s/2, width:s, height:s, fill:MARK.cp, stroke:'#fff', 'stroke-width':2.2 }));
+    if (S.labels.pt) g.appendChild(mkLabel(c.pt || '', 0, 0, 11, '#fff'));
+    g.appendChild(mkLabel('CP', s/2+6, 0, 10, '#fff', 'start'));
+  } else { // rp witness — triangle
+    const t = r*1.4;
+    if (sel) g.appendChild(el('circle', { r:r+10, fill:'none', stroke:'#00e5d1', 'stroke-width':1.5, 'stroke-dasharray':'3 3' }));
+    g.appendChild(el('polygon', { points:`0,${-t} ${t*0.87},${t*0.5} ${-t*0.87},${t*0.5}`,
+      fill:MARK.rp, stroke:'#fff', 'stroke-width':2 }));
+    g.appendChild(mkLabel('RP', 0, t*0.5+10, 10, '#fff'));
+  }
+  // generous transparent hit pad so cards select on click
+  const pad = el('circle', { r:r+9, fill:'transparent' });
+  g.insertBefore(pad, g.firstChild);
+  g.style.cursor = 'pointer';
+  g.addEventListener('mousedown', (ev)=>{ ev.stopPropagation(); selectCorner(c.id, true); });
+  layMarkers.appendChild(g);
+}
+
+function mkLabel(txt, dx, dy, size, fill, anchor) {
+  return el('text', { x:dx, y:dy, 'text-anchor':anchor||'middle', 'dominant-baseline':'central',
+    'font-family':"'JetBrains Mono', monospace", 'font-size':size, 'font-weight':700,
+    fill:fill||'#fff', stroke:'#000', 'stroke-width':0.8, 'paint-order':'stroke' }, txt);
+}
+
+function hasCalloutText(c){ return (c.monument||c.afn||c.dig||'').trim().length > 0; }
+
+function drawCallout(c, X, Y) {
+  // initialize box offset: push outward from parcel centroid, first time only
+  if (!c.coInit) { initCalloutOffset(c); c.coInit = true; }
+  const bx = X + c.co.dx, by = Y + c.co.dy;
+
+  // ----- compose lines (manual wrap) -----
+  const W = 196, padX = 9, lh = 14, fsHead = 11, fsBody = 11.5;
+  const lines = [];
+  const head = (c.pt ? ('PT '+c.pt+'  ') : '') + c.status;
+  if (c.monument) wrap(c.monument, 28).forEach(l=>lines.push({t:l, kind:'body'}));
+  if (c.afn) wrap('Per AFN '+c.afn, 28).forEach(l=>lines.push({t:l, kind:'meta'}));
+  if (c.dig) wrap('▸ '+c.dig, 28).forEach(l=>lines.push({t:l, kind:'dig'}));
+  const bodyH = lines.length*lh;
+  const H = 22 + bodyH + 8;
+  const col = STATUS_COLOR[c.status] || '#8896a6';
+
+  // ----- leader: dogleg from corner to nearest box edge -----
+  const target = nearestBoxAnchor(X, Y, bx, by, W, H);
+  const leadG = el('g');
+  // a short stub off the corner then to the box keeps it readable in clutter
+  leadG.appendChild(el('line', { x1:X, y1:Y, x2:target.x, y2:target.y,
+    stroke:'#000', 'stroke-width':3, 'stroke-opacity':0.5 }));
+  leadG.appendChild(el('line', { x1:X, y1:Y, x2:target.x, y2:target.y,
+    stroke:col, 'stroke-width':1.4 }));
+  leadG.appendChild(el('circle', { cx:X, cy:Y, r:3, fill:col, stroke:'#000', 'stroke-width':0.6 }));
+  layLeaders.appendChild(leadG);
+
+  // ----- box -----
+  const g = el('g', { class:'cc-box', 'data-id':c.id, filter:'url(#ccShadow)' });
+  g.appendChild(el('rect', { x:bx, y:by, width:W, height:H, rx:6,
+    fill:'rgba(17,22,27,0.93)', stroke:col, 'stroke-width':1.4 }));
+  g.appendChild(el('rect', { x:bx, y:by, width:4, height:H, rx:2, fill:col }));   // status spine
+  // header
+  g.appendChild(el('text', { x:bx+padX, y:by+15, 'font-family':"'JetBrains Mono', monospace",
+    'font-size':fsHead, 'font-weight':700, fill:col, 'letter-spacing':'0.04em' }, head));
+  // body lines
+  let yy = by + 22 + lh*0.5 + 3;
+  for (const ln of lines) {
+    const fill = ln.kind==='meta' ? '#8896a6' : (ln.kind==='dig' ? '#ffb547' : '#f4f2ed');
+    g.appendChild(el('text', { x:bx+padX, y:yy, 'font-family':var_sans(), 'font-size':fsBody,
+      'font-weight': ln.kind==='body'?500:400, fill }, ln.t));
+    yy += lh;
+  }
+  g.style.cursor = 'move';
+  g.addEventListener('mousedown', (ev)=>startCalloutDrag(ev, c));
+  layCallouts.appendChild(g);
+}
+function var_sans(){ return "'Sora', system-ui, sans-serif"; }
+
+function wrap(str, maxChars) {
+  const words = String(str).split(/\s+/); const out=[]; let line='';
+  for (const w of words) {
+    if ((line+' '+w).trim().length > maxChars && line) { out.push(line); line = w; }
+    else line = (line ? line+' ' : '') + w;
+  }
+  if (line) out.push(line);
+  return out;
+}
+function initCalloutOffset(c) {
+  // direction from parcel centroid → corner, pushed outward; fan by id to de-stack
+  const loop = S.corners.filter(x => x.ring === 1);
+  let cN=0, cE=0; const base = loop.length ? loop : S.corners;
+  base.forEach(x=>{ cN+=x.n; cE+=x.e; });
+  cN/=base.length; cE/=base.length;
+  let ux = c.e - cE, uy = c.n - cN; const m = Math.hypot(ux,uy)||1; ux/=m; uy/=m;
+  const dist = 78;
+  // dx in screen +x = +E ; dy screen +y = -N
+  c.co.dx = ux*dist + (c.marker==='rp'? 18:0);
+  c.co.dy = -uy*dist - 18;
+  if (Math.abs(c.co.dx) < 30 && c.co.dx >= 0) c.co.dx = 60;
+}
+function nearestBoxAnchor(X, Y, bx, by, W, H) {
+  // clamp corner point onto the box rectangle perimeter → tidy leader landing
+  const cx = Math.max(bx, Math.min(X, bx+W));
+  const cy = Math.max(by, Math.min(Y, by+H));
+  // if corner is inside box horizontally, land on top/bottom edge; else nearest side
+  const x = (X < bx) ? bx : (X > bx+W ? bx+W : cx);
+  const y = (Y < by) ? by : (Y > by+H ? by+H : cy);
+  return { x, y };
+}
+function byId(id){ return S.corners.find(c=>c.id===id); }
+
+/* ---- scale bar (exact: geometry is true survey feet) ---- */
+function refreshScaleBar() {
+  const ftPerPx = 1 / sc();
+  const round = [5,10,20,25,50,100,200,250,500,1000,2000,5000,10000];
+  let chosen = round[0], px = 0;
+  for (const f of round) { const p = f/ftPerPx; if (p>=70 && p<=160){chosen=f;px=p;break;} if (p<70){chosen=f;px=p;} }
+  if (px===0) px = chosen/ftPerPx;
+  document.getElementById('scaleBarBar').style.width = Math.max(40, Math.min(220, px)) + 'px';
+  document.getElementById('scaleBarLbl').textContent = `0 — ${chosen} ft`;
+}
+function refreshViewScale() {
+  const ftPerInch = (1/sc()) * 96;          // CSS px ≈ 1/96"
+  document.getElementById('viewScale').textContent =
+    S.corners.length ? `≈ 1″ = ${ftPerInch.toFixed(0)} ft (screen) · ${(S.view.scale*100).toFixed(0)}% zoom` : '—';
+}
+
+/* ---------------------------------------------------------------------
+   INTERACTION — pan / zoom / align photo / drag callout
+   --------------------------------------------------------------------- */
+svg.addEventListener('mousedown', (e) => {
+  const p = { x:e.clientX, y:e.clientY };
+  if (S.align && S.img) {
+    S.drag = { kind:'img', sx:p.x, sy:p.y, wx:S.img.wx, wy:S.img.wy };
+    svg.classList.add('aligning');
+  } else {
+    S.drag = { kind:'pan', sx:p.x, sy:p.y, px:S.view.panX, py:S.view.panY };
+    svg.classList.add('panning');
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  const d = S.drag; if (!d) return;
+  if (d.kind === 'pan') {
+    S.view.panX = d.px + (e.clientX - d.sx);
+    S.view.panY = d.py + (e.clientY - d.sy);
+    render();
+  } else if (d.kind === 'img' && S.img) {
+    const dxw = (e.clientX - d.sx)/sc(), dyw = (e.clientY - d.sy)/sc();
+    S.img.wx = d.wx + dxw; S.img.wy = d.wy - dyw;   // screen +y is -N
+    renderImage();
+  } else if (d.kind === 'callout') {
+    const c = byId(d.id);
+    c.co.dx = d.dx + (e.clientX - d.sx);
+    c.co.dy = d.dy + (e.clientY - d.sy);
+    renderMarkersAndCallouts();
+  }
+});
+window.addEventListener('mouseup', () => {
+  if (S.drag) { S.drag = null; svg.classList.remove('panning','aligning'); }
+});
+function startCalloutDrag(ev, c) {
+  ev.stopPropagation();
+  selectCorner(c.id, false);
+  S.drag = { kind:'callout', id:c.id, sx:ev.clientX, sy:ev.clientY, dx:c.co.dx, dy:c.co.dy };
+}
+
+// wheel: zoom map (no photo) OR scale photo when in align mode
+stageWrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (S.align && S.img) {
+    S.img.wWorld *= (e.deltaY < 0 ? 1.06 : 0.94);
+    renderImage();
+    return;
+  }
+  if (!S.corners.length) return;
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  // zoom about cursor
+  const before = screenToWorld(e.clientX - stageWrap.getBoundingClientRect().left, e.clientY - stageWrap.getBoundingClientRect().top);
+  S.view.scale = Math.max(0.05, Math.min(40, S.view.scale * factor));
+  const r = stageWrap.getBoundingClientRect();
+  const after = screenToWorld(e.clientX - r.left, e.clientY - r.top);
+  S.view.panX += (after.e - before.e) * sc();
+  S.view.panY -= (after.n - before.n) * sc();
+  render();
+}, { passive:false });
+
+/* ---------------------------------------------------------------------
+   SATELLITE PASTE  (Ctrl+V) — EZ DOC pattern
+   --------------------------------------------------------------------- */
+document.addEventListener('paste', (e) => {
+  const t = e.target;
+  if (t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.isContentEditable)) return;
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  for (const it of items) {
+    if (it.type && it.type.indexOf('image') === 0) {
+      const blob = it.getAsFile();
+      if (blob) { e.preventDefault(); loadImageBlob(blob); return; }
+    }
+  }
+});
+function loadImageBlob(blob) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      // default: center on parcel centroid, span ~1.6× the parcel width
+      let cN=0,cE=0,minE=Infinity,maxE=-Infinity;
+      const base = S.corners.length ? S.corners : [{n:0,e:0}];
+      base.forEach(c=>{cN+=c.n;cE+=c.e; if(c.e<minE)minE=c.e; if(c.e>maxE)maxE=c.e;});
+      cN/=base.length; cE/=base.length;
+      const span = Math.max((maxE-minE)*1.6, 200);
+      S.img = { href: reader.result, natW:im.naturalWidth, natH:im.naturalHeight,
+                wx:cE, wy:cN, wWorld:span, rot:0, opacity:1 };
+      document.getElementById('imgOpacity').value = 100; document.getElementById('imgOpacityOut').textContent='100%';
+      document.getElementById('imgRot').value = 0; document.getElementById('imgRotOut').textContent='0°';
+      setAlign(true);
+      render();
+      setStatus('Satellite pasted. Align mode ON — drag to slide it under the parcel, wheel to scale, Rot to spin. Toggle Align off when set.', 'ok');
+    };
+    im.onerror = () => setStatus('Could not decode the pasted image.', 'warn');
+    im.src = reader.result;
+  };
+  reader.readAsDataURL(blob);
+}
+
+/* ---------------------------------------------------------------------
+   INGEST — From EZ Trav (localStorage) / paste JSON / PNEZD CSV / demo
+   --------------------------------------------------------------------- */
+function classifyDesc(desc) {
+  const d = (desc||'').toUpperCase();
+  let ring=1, marker='findset', status='SEARCH';
+  if (/\b(RP|WIT|WITNESS|REF\s*PT|REFERENCE)\b/.test(d)) { marker='rp'; ring=2; status='FOUND'; }
+  else if (/\b(CP|HUB|CONTROL)\b/.test(d)) { marker='cp'; ring=2; status='FOUND'; }
+  else if (/\b(PLSS|SECTION|SEC\b|1\/4|QUARTER|CORNER\s*OF\s*SEC|BRASS\s*CAP|GLO|BLM)\b/.test(d)) { marker='cp'; ring=3; status='FOUND'; }
+  // status hints
+  if (/\b(NOT\s*FOUND|SEARCH|MISSING|LOST|N\.?F\.?)\b/.test(d)) status='SEARCH';
+  else if (/\b(SET|TO\s*SET|TBS|MON\s*SET)\b/.test(d)) status='SET';
+  else if (/\b(FD|FOUND|FND|HELD|EXISTING)\b/.test(d)) status='FOUND';
+  // pull an AFN if present
+  let afn=''; const m = d.match(/AFN[^0-9]*([0-9]{6,})/); if (m) afn = m[1];
+  return { ring, marker, status, afn };
+}
+function ingestPoints(points, opts) {
+  opts = opts || {};
+  S.corners = []; S.nextId = 1; S.selId = null;
+  for (const p of points) {
+    const n = parseFloat(p.n), e = parseFloat(p.e);
+    if (isNaN(n) || isNaN(e)) continue;
+    const desc = p.desc || p.d || '';
+    const cls = classifyDesc(desc);
+    S.corners.push(makeCorner({
+      pt: String(p.calc != null ? p.calc : (p.p != null ? p.p : (p.pt != null ? p.pt : ''))),
+      n, e, monument: desc, afn: cls.afn,
+      ring: cls.ring, marker: cls.marker, status: cls.status,
+    }));
+  }
+  // wire RP witnesses to the nearest ring-1 corner (RP→MON leader)
+  for (const c of S.corners) {
+    if (c.marker !== 'rp') continue;
+    let best=null, bd=Infinity;
+    for (const t of S.corners) { if (t.marker==='rp') continue;
+      const dd = Math.hypot(t.n-c.n, t.e-c.e); if (dd<bd){bd=dd;best=t;} }
+    if (best) c.rpTargetId = best.id;
+  }
+  S.closed = opts.closed != null ? opts.closed : true;
+  recomputeCourses();
+  computeFit();
+  S.view.scale=1; S.view.panX=0; S.view.panY=0;
+  render(); renderCornerList(); updateJobMeta();
+}
+function updateJobMeta() {
+  const m = S.meta; const box = document.getElementById('jobmeta');
+  if (!S.corners.length) { box.innerHTML = '<span class="src">no geometry loaded</span>'; return; }
+  const bits = [];
+  if (m.job) bits.push(`Job <b>${esc(m.job)}</b>`);
+  if (m.client) bits.push(`<b>${esc(m.client)}</b>`);
+  if (m.county) bits.push(`${esc(m.county)} Co.`);
+  bits.push(`<span class="src">${S.corners.length} pts · ${S.courses.length} courses${S.closed?' · closed':''} · ${esc(m.source||'')}</span>`);
+  box.innerHTML = bits.join('<span style="color:var(--border)">|</span> ');
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
+
+function loadFromTravPayload(job, source) {
+  if (!job || !job.traverse || !Array.isArray(job.traverse.points)) {
+    setStatus('Payload has no traverse.points array.', 'warn'); return false;
+  }
+  S.meta = { job: job.job_number||'', client: job.client_name||'', county: job.county||'', source: source||'EZ Trav' };
+  ingestPoints(job.traverse.points, { closed: !!job.traverse.closed });
+  setStatus(`Loaded ${S.corners.length} points from ${source||'EZ Trav'}${job.traverse.label?` (traverse ${job.traverse.label})`:''}.`, 'ok');
+  return true;
+}
+document.getElementById('btnFromTrav').addEventListener('click', () => {
+  let raw=null;
+  try { raw = localStorage.getItem('ez_current_job'); } catch(_){}
+  if (!raw) {
+    setStatus('No ez_current_job in this app\'s storage. Use “Paste payload” (file:// apps usually can\'t share storage).', 'warn');
+    openModal('jsonModal'); return;
+  }
+  try { loadFromTravPayload(JSON.parse(raw), 'EZ Trav (localStorage)'); }
+  catch(err){ setStatus('Could not parse ez_current_job: '+err.message, 'warn'); }
+});
+document.getElementById('btnPasteJson').addEventListener('click', ()=>openModal('jsonModal'));
+document.getElementById('jsonLoad').addEventListener('click', () => {
+  const raw = document.getElementById('jsonInput').value.trim();
+  if (!raw) return;
+  let data;
+  try { data = JSON.parse(raw); } catch(err){ setStatus('Invalid JSON: '+err.message, 'warn'); return; }
+  if (Array.isArray(data)) {
+    // bare PNEZD-ish array
+    const pts = data.map(r => ({ calc:r.P||r.p||r.calc, n:r.N||r.n, e:r.E||r.e, desc:r.D||r.d||r.desc }));
+    S.meta = { job:'', client:'', county:'', source:'pasted array' };
+    ingestPoints(pts, { closed:true });
+    setStatus(`Loaded ${S.corners.length} points from pasted array.`, 'ok');
+  } else {
+    loadFromTravPayload(data, 'pasted payload');
+  }
+  closeModal('jsonModal');
+});
+document.getElementById('btnImportCsv').addEventListener('click', ()=>openModal('csvModal'));
+document.getElementById('csvLoad').addEventListener('click', () => {
+  const raw = document.getElementById('csvInput').value;
+  const closed = document.getElementById('csvClosed').classList.contains('on');
+  const pts = parsePNEZD(raw);
+  if (!pts.length) { setStatus('No valid points parsed.', 'warn'); return; }
+  S.meta = { job:'', client:'', county:'', source:'PNEZD CSV' };
+  ingestPoints(pts, { closed });
+  setStatus(`Imported ${S.corners.length} points from PNEZD.`, 'ok');
+  closeModal('csvModal');
+});
+function parsePNEZD(raw) {
+  const out=[];
+  raw.split(/\r?\n/).forEach((line,i) => {
+    const s = line.trim(); if (!s) return;
+    if (/[a-zA-Z]/.test(s.split(/[, \t]/)[1]||'') && i===0 && /point|north|east/i.test(s)) return; // header
+    const parts = s.split(/\s*,\s*|\s+/);
+    if (parts.length < 3) return;
+    const P = parts[0], N = parseFloat(parts[1]), E = parseFloat(parts[2]);
+    if (isNaN(N)||isNaN(E)) return;
+    const desc = parts.slice(4).join(' ') || parts.slice(3).join(' ');
+    out.push({ calc:P, n:N, e:E, desc: isNaN(parseFloat(parts[3]))? (parts.slice(3).join(' ')) : desc });
+  });
+  return out;
+}
+
+/* ---- SAMPLE parcel — exercises every feature ---- */
+document.getElementById('btnDemo').addEventListener('click', loadDemo);
+function loadDemo() {
+  S.meta = { job:'24-118', client:'HALVERSON', county:'Lewis', source:'sample' };
+  const pts = [
+    { calc:1, n:10000.00, e:10000.00, desc:'FD 5/8" REBAR W/ CAP LS 35153, HELD' },
+    { calc:2, n:10000.00, e:10210.50, desc:'SET 1/2" REBAR W/ CAP LS 41207' },
+    { calc:3, n:10162.30, e:10198.20, desc:'ORIG IRON PIPE PER AFN 3114402 NOT FOUND 2018, SEARCH' },
+    { calc:4, n:10150.10, e:10004.80, desc:'FD 5/8" REBAR W/ CAP LS 35153, HELD' },
+    { calc:11, n:10082.00, e:9690.00, desc:'FD 3" BRASS CAP 1/4 COR SEC 14 PLSS' },
+    { calc:21, n:9982.00, e:9992.00, desc:'RP FENCE COR POST WITNESS TO PT 1' },
+  ];
+  ingestPoints(pts, { closed:true });
+  // hand-tune a couple statuses/notes the classifier can't infer
+  const c3 = S.corners.find(c=>c.pt==='3'); if (c3){ c3.dig='Grub the NE fence return; orig. pipe likely 0.4\' below grade.'; }
+  const c2 = S.corners.find(c=>c.pt==='2'); if (c2){ c2.dig='Set on line, 210.50\' from PT 1.'; }
+  render(); renderCornerList(); updateJobMeta();
+  setStatus('Sample parcel loaded. Paste a satellite clip (Ctrl+V) to put it on the ground.', 'ok');
+}
+
+/* ---------------------------------------------------------------------
+   CORNER SIDE PANEL
+   --------------------------------------------------------------------- */
+function renderCornerList() {
+  const list = document.getElementById('cornerList');
+  list.innerHTML = '';
+  document.getElementById('cornerCount').textContent = S.corners.length;
+  for (const c of S.corners) {
+    const card = document.createElement('div');
+    card.className = 'cc' + (c.id===S.selId ? ' sel open' : '');
+    card.style.borderLeftColor = STATUS_COLOR[c.status] || 'var(--fg-mute)';
+    card.innerHTML = `
+      <div class="cc-head">
+        <span class="cc-pt">${esc(c.pt||'·')}</span>
+        <span class="cc-status st-${c.status}">${c.status}</span>
+        <span class="cc-desc">${esc(c.monument||'(no description)')}</span>
+        <span class="cc-ring">R${c.ring}</span>
+      </div>
+      <div class="cc-body">
+        <div class="fld"><label>Status</label>
+          <div class="seg status" data-f="status">
+            <button data-v="FOUND" class="${c.status==='FOUND'?'on':''}">Found</button>
+            <button data-v="SET" class="${c.status==='SET'?'on':''}">Set</button>
+            <button data-v="SEARCH" class="${c.status==='SEARCH'?'on':''}">Search</button>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fld"><label>Marker</label>
+            <select data-f="marker">
+              <option value="findset" ${c.marker==='findset'?'selected':''}>FIND/SET pin</option>
+              <option value="cp" ${c.marker==='cp'?'selected':''}>CP / control square</option>
+              <option value="rp" ${c.marker==='rp'?'selected':''}>RP witness</option>
+            </select>
+          </div>
+          <div class="fld"><label>Priority ring</label>
+            <select data-f="ring">
+              <option value="1" ${c.ring===1?'selected':''}>1 · subject</option>
+              <option value="2" ${c.ring===2?'selected':''}>2 · adjacent</option>
+              <option value="3" ${c.ring===3?'selected':''}>3 · PLSS</option>
+              <option value="4" ${c.ring===4?'selected':''}>4 · other</option>
+            </select>
+          </div>
+        </div>
+        <div class="fld"><label>Monument (callout)</label>
+          <textarea data-f="monument" placeholder='FD 5/8" rebar w/ cap LS 35153'>${esc(c.monument)}</textarea>
+        </div>
+        <div class="row2">
+          <div class="fld"><label>Source AFN</label>
+            <input type="text" data-f="afn" value="${esc(c.afn)}" placeholder="3114402"></div>
+          <div class="fld"><label>Show callout</label>
+            <select data-f="showCallout"><option value="1" ${c.showCallout?'selected':''}>On sheet</option><option value="0" ${!c.showCallout?'selected':''}>Hidden</option></select>
+          </div>
+        </div>
+        <div class="fld"><label>Dig / find note</label>
+          <textarea data-f="dig" placeholder="Grub fence return; pipe ~0.4' below grade.">${esc(c.dig)}</textarea>
+        </div>
+        <div class="cc-coords">N ${c.n.toFixed(2)}  ·  E ${c.e.toFixed(2)}  ·  (immutable)</div>
+      </div>`;
+    card.querySelector('.cc-head').addEventListener('click', () => {
+      const wasSel = c.id===S.selId;
+      S.selId = wasSel ? null : c.id;
+      renderCornerList(); renderMarkersAndCallouts();
+    });
+    // field wiring
+    card.querySelectorAll('[data-f]').forEach(elm => {
+      const f = elm.getAttribute('data-f');
+      if (elm.classList.contains('seg')) {
+        elm.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+          c.status = b.getAttribute('data-v'); pushCorner(c); renderCornerList();
+        }));
+      } else if (elm.tagName==='SELECT') {
+        elm.addEventListener('change', () => {
+          let v = elm.value;
+          if (f==='ring') c.ring = parseInt(v);
+          else if (f==='showCallout') c.showCallout = (v==='1');
+          else c[f] = v;
+          pushCorner(c);
+          if (f==='ring' || f==='marker') { recomputeCourses(); render(); renderCornerList(); }
+        });
+      } else { // text / textarea
+        elm.addEventListener('input', () => { c[f] = elm.value; pushCorner(c); });
+      }
+    });
+    list.appendChild(card);
+  }
+}
+function pushCorner(c) {
+  // re-render geometry layers affected by a corner edit
+  render();
+  // keep the side card's left stripe synced
+  const card = document.querySelector(`.cc.sel`);
+  if (card) card.style.borderLeftColor = STATUS_COLOR[c.status] || 'var(--fg-mute)';
+}
+function selectCorner(id, scroll) {
+  S.selId = id; renderCornerList(); renderMarkersAndCallouts();
+  if (scroll) {
+    const cards = document.querySelectorAll('.cc');
+    const idx = S.corners.findIndex(c=>c.id===id);
+    if (cards[idx]) cards[idx].scrollIntoView({ block:'nearest', behavior:'smooth' });
+  }
+}
+
+/* ---------------------------------------------------------------------
+   TOOLBAR WIRING — labels, rings, image controls, output
+   --------------------------------------------------------------------- */
+function wireToggle(id, onChange) {
+  const lbl = document.getElementById(id); const cb = lbl.querySelector('input');
+  lbl.addEventListener('click', (e) => {
+    if (cb.disabled) return;
+    if (e.target !== cb) cb.checked = !cb.checked;
+    lbl.classList.toggle('on', cb.checked);
+    onChange(cb.checked);
+  });
+  cb.addEventListener('change', ()=>{ lbl.classList.toggle('on', cb.checked); onChange(cb.checked); });
+}
+wireToggle('tgDist', v=>{ S.labels.dist=v; renderCourseLabels(); });
+wireToggle('tgBear', v=>{ S.labels.bear=v; renderCourseLabels(); });
+wireToggle('tgPt',   v=>{ S.labels.pt=v; renderMarkersAndCallouts(); });
+wireToggle('tgHalo', v=>{ S.labels.halo=v; renderCourseLabels(); });
+wireToggle('tgR2', v=>{ S.rings[2]=v; render(); });
+wireToggle('tgR3', v=>{ S.rings[3]=v; render(); });
+wireToggle('tgR4', v=>{ S.rings[4]=v; render(); });
+
+document.getElementById('btnPasteImg').addEventListener('click', () =>
+  setStatus('Snip a satellite view (Win+Shift+S), then press Ctrl+V right here on the sheet.', 'ok'));
+function setAlign(on) {
+  S.align = on;
+  document.getElementById('btnAlign').classList.toggle('active', on);
+}
+document.getElementById('btnAlign').addEventListener('click', () => {
+  if (!S.img) { setStatus('Paste a satellite clip first (Ctrl+V).', 'warn'); return; }
+  setAlign(!S.align);
+  setStatus(S.align ? 'Align ON — drag photo, wheel = scale, Rot slider = spin. Geometry stays put.' : 'Align off. Pan/zoom the map normally now.', 'ok');
+});
+const imgOpacity = document.getElementById('imgOpacity');
+imgOpacity.addEventListener('input', () => {
+  document.getElementById('imgOpacityOut').textContent = imgOpacity.value+'%';
+  if (S.img){ S.img.opacity = imgOpacity.value/100; renderImage(); }
+});
+const imgRot = document.getElementById('imgRot');
+imgRot.addEventListener('input', () => {
+  document.getElementById('imgRotOut').textContent = imgRot.value+'°';
+  if (S.img){ S.img.rot = parseInt(imgRot.value); renderImage(); }
+});
+document.getElementById('btnImgReset').addEventListener('click', () => {
+  if (!S.img) return;
+  let cN=0,cE=0,minE=Infinity,maxE=-Infinity;
+  S.corners.forEach(c=>{cN+=c.n;cE+=c.e;if(c.e<minE)minE=c.e;if(c.e>maxE)maxE=c.e;});
+  const k=S.corners.length||1; cN/=k;cE/=k;
+  S.img.wx=cE; S.img.wy=cN; S.img.wWorld=Math.max((maxE-minE)*1.6,200); S.img.rot=0;
+  imgRot.value=0; document.getElementById('imgRotOut').textContent='0°';
+  renderImage();
+});
+
+document.getElementById('btnFit').addEventListener('click', fitView);
+document.getElementById('btnZin').addEventListener('click', ()=>{ S.view.scale=Math.min(40,S.view.scale*1.2); render(); });
+document.getElementById('btnZout').addEventListener('click', ()=>{ S.view.scale=Math.max(0.05,S.view.scale*0.8); render(); });
+document.getElementById('btnPrint').addEventListener('click', ()=>{ setAlign(false); window.print(); });
+document.getElementById('btnPng').addEventListener('click', exportPng);
+
+document.addEventListener('keydown', (e) => {
+  if (e.target && (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return;
+  if (e.key==='f'||e.key==='F') { fitView(); }
+  if (e.key==='Escape') { S.selId=null; renderCornerList(); renderMarkersAndCallouts(); }
+});
+
+/* ---- modal helpers ---- */
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('[data-close]').forEach(x => x.addEventListener('click', ()=>closeModal(x.getAttribute('data-close'))));
+document.querySelectorAll('.modal-bg').forEach(bg => bg.addEventListener('click', e=>{ if(e.target===bg) bg.classList.remove('show'); }));
+// CSV-closed toggle is a .toggle
+(function(){ const t=document.getElementById('csvClosed'); const cb=t.querySelector('input');
+  t.addEventListener('click', e=>{ if(e.target!==cb) cb.checked=!cb.checked; t.classList.toggle('on',cb.checked); }); })();
+
+/* ---------------------------------------------------------------------
+   PNG EXPORT — serialize the live SVG to a raster (offline, no libs)
+   --------------------------------------------------------------------- */
+function exportPng() {
+  if (!S.corners.length) { setStatus('Nothing to export yet.', 'warn'); return; }
+  setAlign(false);
+  const { w, h } = stageSize();
+  const clone = svg.cloneNode(true);
+  clone.setAttribute('width', w); clone.setAttribute('height', h);
+  // paint a solid ground so transparent areas aren't black-on-save
+  const bg = el('rect', { x:0, y:0, width:w, height:h, fill:'#0a0d10' });
+  clone.insertBefore(bg, clone.firstChild);
+  const xml = new XMLSerializer().serializeToString(clone);
+  const blob = new Blob([xml], { type:'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    const scaleUp = 2;                                  // crisp output
+    const cv = document.createElement('canvas');
+    cv.width = w*scaleUp; cv.height = h*scaleUp;
+    const ctx = cv.getContext('2d');
+    ctx.scale(scaleUp, scaleUp);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    cv.toBlob(b => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = `EZ_MAP_${(S.meta.job||'search').replace(/[^\w-]/g,'_')}.png`;
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+      setStatus('PNG saved.', 'ok');
+    }, 'image/png');
+  };
+  img.onerror = () => setStatus('PNG export failed (the pasted photo may block canvas export on file://). Use Print → Save as PDF instead.', 'warn');
+  img.src = url;
+}
+
+/* ---------------------------------------------------------------------
+   BOOT
+   --------------------------------------------------------------------- */
+window.addEventListener('resize', () => { computeFit(); render(); });
+// Try the live EZ Trav bridge on open; if it's empty, render an empty sheet
+// with a guidance hint (we never auto-load the demo — the crew chooses a source).
+(function boot(){
+  let raw=null; try { raw = localStorage.getItem('ez_current_job'); } catch(_){}
+  if (raw) {
+    try { if (loadFromTravPayload(JSON.parse(raw), 'EZ Trav (localStorage)')) return; } catch(_){}
+  }
+  render();
+  setStatus('Ready. “From EZ Trav”, “Paste payload”, “PNEZD CSV”, or “Sample” to begin.', '');
+})();
+</script>
+</body>
+</html>
